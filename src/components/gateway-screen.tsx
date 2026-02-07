@@ -3,6 +3,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Terminal } from "lucide-react";
+import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 
 interface GatewayScreenProps {
   onUnlock: () => void;
@@ -12,6 +14,11 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const db = useFirestore();
+
+  // Fetch dynamic gateway sequence from Firestore
+  const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
+  const { data: gatewayData } = useDoc(gatewayRef);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -22,7 +29,9 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.toLowerCase() === "raven.oracle") {
+    const targetSequence = gatewayData?.gatewayAddress || "raven.oracle";
+    
+    if (input.toLowerCase().trim() === targetSequence.toLowerCase()) {
       onUnlock();
     } else {
       setError(true);

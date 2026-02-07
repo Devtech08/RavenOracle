@@ -5,35 +5,73 @@ import { useState, useEffect } from "react";
 import { GatewayScreen } from "@/components/gateway-screen";
 import { VerificationScreen } from "@/components/verification-screen";
 import { ChatRoom } from "@/components/chat-room";
+import { AdminPanel } from "@/components/admin-panel";
+import { FirebaseClientProvider } from "@/firebase/client-provider";
+import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 
-export default function Home() {
-  const [phase, setPhase] = useState<"gateway" | "verification" | "chat">("gateway");
-  const [sessionKey, setSessionKey] = useState<string | null>(null);
+function RavenOracleApp() {
+  const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
+  const [sessionData, setSessionData] = useState<{ callsign: string; key: string } | null>(null);
+  const { user, isUserLoading } = useUser();
+  const db = useFirestore();
+
+  // Check if current user is admin
+  const adminDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "roles_admin", user.uid);
+  }, [db, user]);
+  
+  const { data: adminData, isLoading: isAdminLoading } = useDoc(adminDocRef);
+  const isAdmin = !!adminData;
 
   const handleGatewaySuccess = () => {
     setPhase("verification");
   };
 
-  const handleVerificationSuccess = (key: string) => {
-    setSessionKey(key);
+  const handleVerificationSuccess = (callsign: string, key: string) => {
+    setSessionData({ callsign, key });
     setPhase("chat");
   };
 
+  const handleToggleAdmin = () => {
+    if (isAdmin) {
+      setPhase(phase === "admin" ? "chat" : "admin");
+    }
+  };
+
   const handleSessionEnd = () => {
-    setSessionKey(null);
+    setSessionData(null);
     setPhase("gateway");
   };
 
+  if (isUserLoading || isAdminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background font-mono text-primary animate-pulse">
+        INITIALIZING_ORACLE...
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Dynamic phase rendering */}
       {phase === "gateway" && <GatewayScreen onUnlock={handleGatewaySuccess} />}
+      
       {phase === "verification" && <VerificationScreen onVerify={handleVerificationSuccess} />}
-      {phase === "chat" && sessionKey && (
+      
+      {phase === "chat" && sessionData && (
         <ChatRoom 
-          sessionKey={sessionKey} 
+          callsign={sessionData.callsign}
+          sessionKey={sessionData.key} 
           onLogout={handleSessionEnd} 
-          isAdmin={sessionKey === "ADMIN_BYPASS_LOGS"} 
+          isAdmin={isAdmin}
+          onOpenAdmin={handleToggleAdmin}
+        />
+      )}
+
+      {phase === "admin" && isAdmin && (
+        <AdminPanel 
+          onClose={() => setPhase("chat")} 
         />
       )}
       
@@ -43,5 +81,13 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary rounded-full blur-[150px]" />
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <FirebaseClientProvider>
+      <RavenOracleApp />
+    </FirebaseClientProvider>
   );
 }

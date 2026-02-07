@@ -5,55 +5,50 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { 
   Send, 
-  ShieldCheck, 
   LogOut, 
-  Eye, 
-  Trash2, 
-  User, 
   Ghost,
-  Lock
+  Lock,
+  Settings
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
   sender: string;
-  content: string; // This would be the encrypted text in a real app
+  content: string;
   timestamp: string;
   isMe: boolean;
 }
 
 interface ChatRoomProps {
+  callsign: string;
   sessionKey: string;
   isAdmin: boolean;
   onLogout: () => void;
+  onOpenAdmin: () => void;
 }
 
-export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
+export function ChatRoom({ callsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Load initial welcome message
   useEffect(() => {
     const welcome: Message = {
       id: "system-1",
       sender: "ORACLE",
       content: isAdmin 
-        ? "ADMIN_ACCESS_GRANTED. All past logs decrypted for review."
-        : "ENCRYPTED_CHANNEL_ESTABLISHED. Communication is now secure.",
+        ? `ADMIN_ACCESS_GRANTED: Welcome back, ${callsign}. All past logs decrypted.`
+        : `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${callsign}. Communication is now secure.`,
       timestamp: new Date().toLocaleTimeString(),
       isMe: false,
     };
     setMessages([welcome]);
-  }, [isAdmin]);
+  }, [isAdmin, callsign]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -69,7 +64,7 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
 
     const newMessage: Message = {
       id: `msg-${Date.now()}`,
-      sender: isAdmin ? "ADMIN" : "USER",
+      sender: callsign,
       content: input,
       timestamp: new Date().toLocaleTimeString(),
       isMe: true,
@@ -78,12 +73,12 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
     setMessages((prev) => [...prev, newMessage]);
     setInput("");
 
-    // Simulate reply
+    // Simulated reply for UX feedback
     setTimeout(() => {
       const reply: Message = {
         id: `reply-${Date.now()}`,
         sender: "ORACLE",
-        content: `Acknowledged. Data sequence ${Math.random().toString(36).substring(7).toUpperCase()} recorded.`,
+        content: `Acknowledged, ${callsign}. Sequence ${Math.random().toString(36).substring(7).toUpperCase()} recorded.`,
         timestamp: new Date().toLocaleTimeString(),
         isMe: false,
       };
@@ -91,19 +86,8 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
     }, 1500);
   };
 
-  const handleLogout = () => {
-    if (!isAdmin) {
-      toast({
-        title: "SESSION_PURGED",
-        description: "All local and server-side logs for this session have been deleted.",
-      });
-    }
-    onLogout();
-  };
-
   return (
     <div className="flex flex-col w-full h-screen max-w-4xl bg-card/80 backdrop-blur-xl border-x border-border shadow-2xl animate-fade-in">
-      {/* Header */}
       <header className="p-4 border-b border-border bg-secondary/50 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-primary/20 rounded-lg">
@@ -113,21 +97,27 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
             <h1 className="text-sm font-bold tracking-widest uppercase text-primary">Raven Oracle</h1>
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <span>Session: {isAdmin ? "ADMIN_LOG_REVIEW" : "E2EE_ACTIVE"}</span>
+              <span>Identity: {callsign}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
           {isAdmin && (
-            <Badge variant="outline" className="border-primary text-primary text-[10px] px-2 py-0">
-              LOGS_VISIBLE
-            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenAdmin}
+              className="border-primary/50 text-primary hover:bg-primary/10 text-[10px]"
+            >
+              <Settings className="w-3 h-3 mr-2" />
+              ADMIN_PANEL
+            </Button>
           )}
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={handleLogout}
+            onClick={onLogout}
             className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           >
             <LogOut className="w-4 h-4 mr-2" />
@@ -136,7 +126,6 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
         </div>
       </header>
 
-      {/* Messages Area */}
       <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
         <div className="space-y-6 pb-4">
           {messages.map((msg) => (
@@ -160,47 +149,28 @@ export function ChatRoom({ sessionKey, isAdmin, onLogout }: ChatRoomProps) {
               >
                 {msg.content}
               </div>
-              {isAdmin && !msg.isMe && (
-                <div className="mt-1 px-1 flex items-center space-x-1 opacity-40">
-                  <ShieldCheck className="w-3 h-3 text-primary" />
-                  <span className="text-[8px] uppercase">Integrity Verified</span>
-                </div>
-              )}
             </div>
           ))}
         </div>
       </ScrollArea>
 
-      {/* Input Area */}
       <footer className="p-4 border-t border-border bg-secondary/30">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <Input 
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isAdmin ? "Reviewing logs... (Input disabled)" : "Communicate with the shadows..."}
+            placeholder="Communicate with the shadows..."
             className="flex-1 bg-background/50 border-border focus:ring-primary focus:border-primary placeholder:text-muted-foreground/50"
-            disabled={isAdmin}
           />
           <Button 
             type="submit" 
             size="icon" 
-            disabled={!input.trim() || isAdmin}
+            disabled={!input.trim()}
             className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-lg border-glow-cyan"
           >
             <Send className="w-4 h-4" />
           </Button>
         </form>
-        <div className="mt-2 flex items-center justify-between text-[8px] text-muted-foreground uppercase tracking-widest px-1">
-          <div className="flex items-center space-x-2">
-            <div className="flex space-x-1">
-              <div className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <div className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <div className="w-1 h-1 bg-primary rounded-full animate-bounce" />
-            </div>
-            <span>Encrypted Layer v4.2.0</span>
-          </div>
-          <span>Total Packets: {messages.length * 128} KB</span>
-        </div>
       </footer>
     </div>
   );

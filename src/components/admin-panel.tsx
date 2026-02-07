@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   ShieldCheck, 
   Trash2, 
@@ -16,11 +17,15 @@ import {
   Check,
   Zap,
   Globe,
-  Loader2
+  Loader2,
+  MessageSquare,
+  Send,
+  Ghost,
+  History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
+import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -31,8 +36,10 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
   const [newGateway, setNewGateway] = useState("");
   const [newAdminGateway, setNewAdminGateway] = useState("");
   const [inviteLink, setInviteLink] = useState("");
+  const [broadcastInput, setBroadcastInput] = useState("");
   const { toast } = useToast();
   const db = useFirestore();
+  const { user } = useUser();
 
   // Guard queries to only run when the user is officially recognized as an admin in Firestore
   const usersQuery = useMemoFirebase(() => {
@@ -52,6 +59,12 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     return collection(db, "sessionRequests");
   }, [db, isRegistryAdmin]);
   const { data: sessionRequests } = useCollection(sessionRequestsQuery);
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!db || !isRegistryAdmin) return null;
+    return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
+  }, [db, isRegistryAdmin]);
+  const { data: messages } = useCollection(messagesQuery);
 
   const gatewayRef = useMemoFirebase(() => {
     if (!db || !isRegistryAdmin) return null;
@@ -111,6 +124,21 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     }
   };
 
+  const handleSendBroadcast = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastInput.trim() || !user) return;
+
+    addDocumentNonBlocking(collection(db, "messageLogs"), {
+      sender: "WARRIOR",
+      userId: user.uid,
+      content: broadcastInput.trim(),
+      timestamp: serverTimestamp()
+    });
+
+    setBroadcastInput("");
+    toast({ title: "BROADCAST_TRANSMITTED", description: "Priority command sent to all operatives." });
+  };
+
   if (!isRegistryAdmin) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
@@ -124,11 +152,11 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-fade-in">
-      <Card className="w-full max-w-5xl h-[85vh] bg-card/95 border-primary/20 shadow-2xl flex flex-col overflow-hidden">
+      <Card className="w-full max-w-6xl h-[90vh] bg-card/95 border-primary/20 shadow-2xl flex flex-col overflow-hidden">
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase">Command Terminal v1.3.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase">Command Terminal v1.4.0</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
             <X className="w-5 h-5" />
@@ -141,6 +169,7 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
               <TabsTrigger value="sessions" className="text-[10px]">ACCESS_QUEUES</TabsTrigger>
               <TabsTrigger value="members" className="text-[10px]">OPERATIVE_REGISTRY</TabsTrigger>
               <TabsTrigger value="requests" className="text-[10px]">IDENTITY_TASKS</TabsTrigger>
+              <TabsTrigger value="comms" className="text-[10px]">COMMS_HUB</TabsTrigger>
               <TabsTrigger value="system" className="text-[10px]">SYSTEM_CONFIG</TabsTrigger>
             </TabsList>
 
@@ -257,6 +286,60 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                   )}
                 </TableBody>
               </Table>
+            </TabsContent>
+
+            <TabsContent value="comms" className="flex-1 flex flex-col space-y-4 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+                <div className="lg:col-span-2 flex flex-col bg-secondary/10 border border-border rounded-lg overflow-hidden">
+                  <div className="p-3 border-b border-border bg-secondary/20 flex items-center space-x-2">
+                    <History className="w-4 h-4 text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Global_Comms_Archive</span>
+                  </div>
+                  <ScrollArea className="flex-1 p-4">
+                    <div className="space-y-4">
+                      {messages?.map((msg) => (
+                        <div key={msg.id} className="flex flex-col space-y-1">
+                          <div className="flex items-center space-x-2 text-[9px] uppercase font-bold tracking-tighter opacity-60">
+                            <span className={msg.sender === 'WARRIOR' ? 'text-primary' : ''}>{msg.sender}</span>
+                            <span className="opacity-40">{msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ''}</span>
+                          </div>
+                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
+                      {messages?.length === 0 && (
+                        <div className="text-center py-20 opacity-20 text-[10px] uppercase">No archives detected</div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+
+                <div className="flex flex-col space-y-4">
+                  <Card className="bg-secondary/10 border-border">
+                    <CardHeader className="py-3 px-4">
+                      <div className="flex items-center space-x-2">
+                        <MessageSquare className="w-4 h-4 text-primary" />
+                        <CardTitle className="text-[10px] uppercase">Command Broadcast</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4">
+                      <form onSubmit={handleSendBroadcast} className="space-y-4">
+                        <textarea
+                          value={broadcastInput}
+                          onChange={(e) => setBroadcastInput(e.target.value)}
+                          placeholder="Transmit priority command..."
+                          className="w-full h-32 bg-background border border-border rounded p-3 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
+                        />
+                        <Button type="submit" disabled={!broadcastInput.trim()} className="w-full bg-primary text-primary-foreground font-bold text-[10px]">
+                          <Send className="w-4 h-4 mr-2" />
+                          SEND_BROADCAST
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="system" className="space-y-6">

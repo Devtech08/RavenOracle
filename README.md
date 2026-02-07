@@ -38,6 +38,7 @@ To ensure maximum security, standard operatives must undergo the following seque
 
 ### 1. Secure Communication Hub
 - **Targeted Messaging**: Users can broadcast to `ALL` or target specific callsigns (e.g., `WARRIOR`).
+- **File Transmissions**: Securely attach and share data fragments (images or documents) within the communication stream.
 - **Session-Locked History**: Operatives only see communications transmitted since their specific session began. History is purged locally on termination.
 - **Command Broadcasts**: Administrators can transmit priority orders to individuals or the entire team.
 
@@ -58,3 +59,5 @@ To run this project locally:
 
 ---
 *The shadows hold your secrets. Encrypted end-to-end.*
+
+**WARRIOR**

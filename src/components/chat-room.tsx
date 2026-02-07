@@ -13,6 +13,13 @@ import {
   DialogTrigger,
   DialogFooter
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Send, 
   LogOut, 
@@ -20,20 +27,12 @@ import {
   Lock,
   Settings,
   User,
-  History
+  History,
+  Target
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
-
-interface Message {
-  id: string;
-  sender: string;
-  userId?: string;
-  content: string;
-  timestamp: string;
-  isMe: boolean;
-}
+import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp } from "firebase/firestore";
 
 interface ChatRoomProps {
   callsign: string;
@@ -44,10 +43,11 @@ interface ChatRoomProps {
 }
 
 export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
-  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [recipientInput, setRecipientInput] = useState("ALL");
   const [newCallsign, setNewCallsign] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
+  const [sessionStartTime] = useState<Timestamp>(Timestamp.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const db = useFirestore();
@@ -61,35 +61,39 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const { data: userData } = useDoc(userDocRef);
   const currentCallsign = userData?.callsign || initialCallsign;
 
-  // Real-time listener for admins to see ALL history
+  // Real-time listener for current session messages
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !isAdmin) return null;
-    return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
-  }, [db, isAdmin]);
-
-  const { data: historicalMessages } = useCollection(messagesQuery);
-
-  // Determine which messages to show
-  const displayMessages = isAdmin && historicalMessages 
-    ? historicalMessages.map(m => ({
-        ...m,
-        timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString() : new Date(m.timestamp).toLocaleTimeString(),
-        isMe: m.userId === user?.uid
-      }))
-    : sessionMessages;
-
-  useEffect(() => {
-    if (!isAdmin) {
-      const welcome: Message = {
-        id: "system-1",
-        sender: "ORACLE",
-        content: `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${currentCallsign}. Communication is now secure. Past logs cleared for this session.`,
-        timestamp: new Date().toLocaleTimeString(),
-        isMe: false,
-      };
-      setSessionMessages([welcome]);
+    if (!db) return null;
+    
+    if (isAdmin) {
+      // Admins see everything
+      return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
+    } else {
+      // Users see messages sent since session started, AND directed to them or "ALL"
+      // Note: In local state we also see what we sent.
+      return query(
+        collection(db, "messageLogs"),
+        where("timestamp", ">=", sessionStartTime),
+        orderBy("timestamp", "asc")
+      );
     }
-  }, [isAdmin, currentCallsign]);
+  }, [db, isAdmin, sessionStartTime]);
+
+  const { data: rawMessages } = useCollection(messagesQuery);
+
+  // Filter messages for non-admins to ensure they only see what they are supposed to
+  const displayMessages = rawMessages ? rawMessages.filter(m => {
+    if (isAdmin) return true;
+    return (
+      m.recipient === "ALL" || 
+      m.recipient === currentCallsign || 
+      m.userId === user?.uid
+    );
+  }).map(m => ({
+    ...m,
+    timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString() : new Date().toLocaleTimeString(),
+    isMe: m.userId === user?.uid
+  })) : [];
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -105,38 +109,22 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     if (!input.trim() || !user) return;
 
     const messageContent = input.trim();
+    const target = recipientInput.trim().toUpperCase();
+    
     setInput("");
 
-    // 1. Write to Firestore (Permanent log for Admin)
     addDocumentNonBlocking(collection(db, "messageLogs"), {
       sender: currentCallsign,
       userId: user.uid,
+      recipient: target,
       content: messageContent,
       timestamp: serverTimestamp()
     });
 
-    // 2. Update local state for Non-Admins (Session-only visibility)
-    if (!isAdmin) {
-      const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        sender: currentCallsign,
-        content: messageContent,
-        timestamp: new Date().toLocaleTimeString(),
-        isMe: true,
-      };
-      setSessionMessages((prev) => [...prev, newMessage]);
-
-      // Simulated Oracle reply for Users
-      setTimeout(() => {
-        const reply: Message = {
-          id: `reply-${Date.now()}`,
-          sender: "ORACLE",
-          content: `Acknowledged, ${currentCallsign}. Data packet encrypted and archived.`,
-          timestamp: new Date().toLocaleTimeString(),
-          isMe: false,
-        };
-        setSessionMessages((prev) => [...prev, reply]);
-      }, 1500);
+    if (target !== "ALL" && target !== "WARRIOR" && !isAdmin) {
+      toast({ 
+        description: `ENCRYPTED_TRANSMISSION: Routing to ${target}. Note: Recipient must be active to receive.`,
+      });
     }
   };
 
@@ -171,7 +159,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <span>Identity: {currentCallsign}</span>
-              {isAdmin && <span className="ml-2 text-primary font-bold">[ARCHIVE_ACCESS: ENABLED]</span>}
+              {isAdmin && <span className="ml-2 text-primary font-bold">[ARCHIVE_ACCESS]</span>}
             </div>
           </div>
         </div>
@@ -233,6 +221,12 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
       <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
         <div className="space-y-6 pb-4">
+          <div className="flex flex-col items-center py-8 opacity-20">
+             <div className="w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent mb-4" />
+             <p className="text-[10px] uppercase tracking-[0.5em]">Session Start: {sessionStartTime.toDate().toLocaleTimeString()}</p>
+             <div className="w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent mt-4" />
+          </div>
+
           {displayMessages.map((msg) => (
             <div 
               key={msg.id} 
@@ -241,7 +235,8 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               <div className="flex items-center space-x-2 mb-1 px-1">
                 {!msg.isMe && <Ghost className="w-3 h-3 text-primary" />}
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                  {msg.sender}
+                  {msg.sender} 
+                  {msg.recipient !== "ALL" && <span className="text-primary/60 ml-1">→ {msg.recipient}</span>}
                 </span>
                 <span className="text-[10px] opacity-40">{msg.timestamp}</span>
               </div>
@@ -249,38 +244,54 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 className={`max-w-[85%] p-3 rounded-lg text-sm leading-relaxed border ${
                   msg.isMe 
                     ? 'bg-primary text-primary-foreground border-primary/20 rounded-tr-none' 
-                    : 'bg-secondary text-foreground border-border rounded-tl-none'
-                } shadow-lg`}
+                    : 'bg-secondary text-foreground border-border rounded-tl-none shadow-[0_0_15px_rgba(0,0,0,0.5)]'
+                }`}
               >
                 {msg.content}
               </div>
             </div>
           ))}
-          {isAdmin && historicalMessages?.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full py-20 opacity-20">
+          {displayMessages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-64 opacity-20">
               <History className="w-12 h-12 mb-4" />
-              <p className="text-xs uppercase tracking-widest">No historical logs found</p>
+              <p className="text-xs uppercase tracking-widest text-center">No communications detected in current session<br/><span className="text-[9px] opacity-50">History cleared automatically</span></p>
             </div>
           )}
         </div>
       </ScrollArea>
 
       <footer className="p-4 border-t border-border bg-secondary/30">
-        <form onSubmit={handleSendMessage} className="flex space-x-2">
-          <Input 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Communicate with the shadows..."
-            className="flex-1 bg-background/50 border-border focus:ring-primary focus:border-primary placeholder:text-muted-foreground/50"
-          />
-          <Button 
-            type="submit" 
-            size="icon" 
-            disabled={!input.trim()}
-            className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-lg border-glow-cyan"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+        <form onSubmit={handleSendMessage} className="flex flex-col space-y-3">
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 bg-background/50 border border-border rounded px-2 py-1">
+              <Target className="w-3 h-3 text-primary opacity-50" />
+              <span className="text-[9px] uppercase font-bold text-muted-foreground">To:</span>
+              <input 
+                value={recipientInput}
+                onChange={(e) => setRecipientInput(e.target.value.toUpperCase())}
+                className="bg-transparent border-none outline-none text-[10px] font-mono text-primary w-24 uppercase"
+                placeholder="ALL / CALLSIGN"
+              />
+            </div>
+            <p className="text-[9px] text-muted-foreground opacity-50 italic">Type 'WARRIOR' for direct Oracle Admin contact.</p>
+          </div>
+          
+          <div className="flex space-x-2">
+            <Input 
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Communicate with the shadows..."
+              className="flex-1 bg-background/50 border-border focus:ring-primary focus:border-primary placeholder:text-muted-foreground/50 h-10"
+            />
+            <Button 
+              type="submit" 
+              size="icon" 
+              disabled={!input.trim()}
+              className="bg-primary hover:bg-primary/80 text-primary-foreground shadow-lg border-glow-cyan h-10 w-10"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </form>
       </footer>
     </div>

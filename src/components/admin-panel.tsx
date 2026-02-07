@@ -9,6 +9,13 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   ShieldCheck, 
   Trash2, 
@@ -21,7 +28,8 @@ import {
   MessageSquare,
   Send,
   Ghost,
-  History
+  History,
+  Target
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -37,11 +45,11 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
   const [newAdminGateway, setNewAdminGateway] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [broadcastInput, setBroadcastInput] = useState("");
+  const [messageRecipient, setMessageRecipient] = useState("ALL");
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
 
-  // Guard queries to only run when the user is officially recognized as an admin in Firestore
   const usersQuery = useMemoFirebase(() => {
     if (!db || !isRegistryAdmin) return null;
     return collection(db, "users");
@@ -124,19 +132,20 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     }
   };
 
-  const handleSendBroadcast = (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!broadcastInput.trim() || !user) return;
 
     addDocumentNonBlocking(collection(db, "messageLogs"), {
       sender: "WARRIOR",
       userId: user.uid,
+      recipient: messageRecipient,
       content: broadcastInput.trim(),
       timestamp: serverTimestamp()
     });
 
     setBroadcastInput("");
-    toast({ title: "BROADCAST_TRANSMITTED", description: "Priority command sent to all operatives." });
+    toast({ title: "MESSAGE_TRANSMITTED", description: messageRecipient === 'ALL' ? "Global broadcast sent." : `Direct message sent to ${messageRecipient}.` });
   };
 
   if (!isRegistryAdmin) {
@@ -156,7 +165,7 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase">Command Terminal v1.4.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.4.0</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
             <X className="w-5 h-5" />
@@ -291,9 +300,12 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
             <TabsContent value="comms" className="flex-1 flex flex-col space-y-4 overflow-hidden">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
                 <div className="lg:col-span-2 flex flex-col bg-secondary/10 border border-border rounded-lg overflow-hidden">
-                  <div className="p-3 border-b border-border bg-secondary/20 flex items-center space-x-2">
-                    <History className="w-4 h-4 text-primary" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Global_Comms_Archive</span>
+                  <div className="p-3 border-b border-border bg-secondary/20 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <History className="w-4 h-4 text-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Global_Comms_Archive</span>
+                    </div>
+                    <Badge variant="outline" className="text-[8px] opacity-50 uppercase tracking-tighter">Read Only Access</Badge>
                   </div>
                   <ScrollArea className="flex-1 p-4">
                     <div className="space-y-4">
@@ -301,9 +313,11 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                         <div key={msg.id} className="flex flex-col space-y-1">
                           <div className="flex items-center space-x-2 text-[9px] uppercase font-bold tracking-tighter opacity-60">
                             <span className={msg.sender === 'WARRIOR' ? 'text-primary' : ''}>{msg.sender}</span>
-                            <span className="opacity-40">{msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ''}</span>
+                            <span className="opacity-40">→</span>
+                            <span className="opacity-70">{msg.recipient}</span>
+                            <span className="opacity-40 ml-auto">{msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ''}</span>
                           </div>
-                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
+                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
                             {msg.content}
                           </div>
                         </div>
@@ -320,20 +334,41 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                     <CardHeader className="py-3 px-4">
                       <div className="flex items-center space-x-2">
                         <MessageSquare className="w-4 h-4 text-primary" />
-                        <CardTitle className="text-[10px] uppercase">Command Broadcast</CardTitle>
+                        <CardTitle className="text-[10px] uppercase">Command Transmissions</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-4">
-                      <form onSubmit={handleSendBroadcast} className="space-y-4">
-                        <textarea
-                          value={broadcastInput}
-                          onChange={(e) => setBroadcastInput(e.target.value)}
-                          placeholder="Transmit priority command..."
-                          className="w-full h-32 bg-background border border-border rounded p-3 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
-                        />
-                        <Button type="submit" disabled={!broadcastInput.trim()} className="w-full bg-primary text-primary-foreground font-bold text-[10px]">
+                      <form onSubmit={handleSendMessage} className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[9px] uppercase opacity-50 flex items-center">
+                            <Target className="w-3 h-3 mr-1" />
+                            Target Recipient
+                          </label>
+                          <Select value={messageRecipient} onValueChange={setMessageRecipient}>
+                            <SelectTrigger className="h-8 text-[10px] bg-background border-border">
+                              <SelectValue placeholder="Select Recipient" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              <SelectItem value="ALL" className="text-[10px]">ALL (BROADCAST)</SelectItem>
+                              {users?.filter(u => u.callsign !== 'WARRIOR').map(u => (
+                                <SelectItem key={u.id} value={u.callsign} className="text-[10px]">{u.callsign}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-[9px] uppercase opacity-50">Transmission Content</label>
+                          <textarea
+                            value={broadcastInput}
+                            onChange={(e) => setBroadcastInput(e.target.value)}
+                            placeholder="Enter command data..."
+                            className="w-full h-32 bg-background border border-border rounded p-3 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
+                          />
+                        </div>
+                        <Button type="submit" disabled={!broadcastInput.trim()} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-9">
                           <Send className="w-4 h-4 mr-2" />
-                          SEND_BROADCAST
+                          TRANSMIT_DATA
                         </Button>
                       </form>
                     </CardContent>

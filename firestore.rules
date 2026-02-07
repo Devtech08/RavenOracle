@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // System identifier for rule deployment: v1.2.1
+    // System identifier for rule deployment: v1.3.0
     function isSignedIn() {
       return request.auth != null;
     }
@@ -25,7 +25,6 @@ service cloud.firestore {
     }
 
     match /gateway/{gatewayId} {
-      // Gateway must be publicly readable for the initial terminal challenge
       allow get: if true;
       allow list, write: if isAdmin();
     }
@@ -37,13 +36,16 @@ service cloud.firestore {
     }
 
     match /messageLogs/{messageLogId} {
-      allow get, list: if isAdmin();
       allow create: if isSignedIn();
+      allow list, get: if isAdmin() || (isSignedIn() && (
+        resource.data.recipient == "ALL" || 
+        resource.data.userId == request.auth.uid ||
+        resource.data.recipient == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.callsign
+      ));
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
-      // Allow a user to write their own admin status to allow for initial bootstrap/setup
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 

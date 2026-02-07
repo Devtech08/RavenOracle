@@ -75,10 +75,11 @@
         "id": { "type": "string" },
         "sender": { "type": "string" },
         "userId": { "type": "string" },
+        "recipient": { "type": "string", "description": "The target callsign or 'ALL'." },
         "content": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["sender", "userId", "content", "timestamp"]
+      "required": ["sender", "userId", "recipient", "content", "timestamp"]
     }
   },
   "auth": {

@@ -22,6 +22,7 @@ function RavenOracleApp() {
   const { toast } = useToast();
   const lastPendingCount = useRef(0);
 
+  // Initialize Anonymous Session immediately
   useEffect(() => {
     if (!isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
@@ -40,13 +41,14 @@ function RavenOracleApp() {
   }, [db, user]);
   const { data: adminData } = useDoc(adminDocRef);
 
-  // Monitor authorization queue for administrators
+  // Identity logic: True if they are in the registry, typed the admin sequence, or are the Warrior
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
+  // Critical Fix: Only initiate the queue query if the user is authenticated and is an admin
   const pendingRequestsQuery = useMemoFirebase(() => {
-    if (!db || !isUserAdmin) return null;
+    if (!db || !user || !isUserAdmin) return null;
     return query(collection(db, "sessionRequests"), where("status", "==", "pending"));
-  }, [db, isUserAdmin]);
+  }, [db, user, isUserAdmin]);
   const { data: pendingRequests } = useCollection(pendingRequestsQuery);
 
   // Global Admin Notification Listener

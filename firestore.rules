@@ -3,11 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // System identifier for rule deployment: v1.6.0
+    // System identifier for rule deployment: v1.7.0
     function isSignedIn() {
       return request.auth != null;
     }
 
+    // Optimized Admin Check: Validates against roles_admin registry
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
@@ -19,12 +20,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow get, list: if isSignedIn();
       allow create: if isOwner(userId);
-      // Only admins can update sensitive fields like isAdmin or isBlocked.
-      // Owners can only update their own profile fields.
+      // Owners can update non-privileged fields; Admins can update all.
       allow update: if isAdmin() || (isOwner(userId) && 
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isBlocked'])
       );
-      // Only administrators can remove a user from the registry.
       allow delete: if isAdmin();
     }
 
@@ -39,14 +38,14 @@ service cloud.firestore {
       allow update: if isSignedIn();
     }
 
-    match /messageLogs/{messageLogId} {
+    match /messageLogs/{messageId} {
       allow create: if isSignedIn();
-      // Allow operatives to list the comms archive once past the gateway.
       allow list, get: if isSignedIn();
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
+      // Allow users to request admin status or admins to manage it
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 

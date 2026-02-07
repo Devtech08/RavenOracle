@@ -17,7 +17,7 @@ To update the main gateway emblem:
 - Ensure there is a folder named `public` at the **root of your project** (outside the `src` folder).
 - Upload your logo file to that root `public/` directory.
 - Ensure the filename is exactly `logo.jpeg`.
-- The system will automatically detect and apply the cyan glow and background-removal blending to the emblem.
+- The system automatically applies **Screen Blending** to filter out black backgrounds and isolates the emblem with a cyan glow.
 
 ## 🔑 Access Control & Identity
 
@@ -32,15 +32,13 @@ Entry is controlled by two primary sequences:
 
 ## 🚀 Per-Session Security Protocol
 
-To ensure maximum security, standard operatives must undergo the following sequence for **every new session**:
+Standard operatives must undergo the following sequence for **every session**:
 
 1.  **Gateway Authentication**: State the correct sequence (`raven.oracle`).
 2.  **Identity Registry**: Submit an active callsign.
-3.  **Command Approval**: Wait for the **WARRIOR** to manually authorize the session request from the Command Terminal.
-4.  **Biometric Visage Link**: Complete a camera-based facial scan to link the physical subject to the session.
-5.  **Session Code Unlock**: Enter the unique 4-digit numeric code provided by the Oracle upon approval.
-
-*Note: Administrators (WARRIOR) bypass stages 3-5 for rapid response capabilities.*
+3.  **Command Approval**: Await manual authorization from the **WARRIOR** (Admins see real-time alerts for pending requests).
+4.  **Biometric Visage Link**: Complete a facial scan to link the physical subject to the session.
+5.  **Session Code Unlock**: Enter the unique 4-digit code provided upon approval.
 
 ---
 *The shadows hold your secrets. Encrypted end-to-end.*

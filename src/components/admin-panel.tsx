@@ -27,10 +27,10 @@ import {
   Loader2,
   MessageSquare,
   Send,
-  Ghost,
   History,
   Target,
-  UserRound
+  UserRound,
+  LayoutDashboard
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -38,10 +38,11 @@ import { collection, doc, query, orderBy, serverTimestamp, getDoc } from "fireba
 
 interface AdminPanelProps {
   onClose: () => void;
+  onReturnToChat?: () => void;
   isRegistryAdmin: boolean;
 }
 
-export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
+export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPanelProps) {
   const [newGateway, setNewGateway] = useState("");
   const [newAdminGateway, setNewAdminGateway] = useState("");
   const [inviteLink, setInviteLink] = useState("");
@@ -52,33 +53,33 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
   const { user } = useUser();
 
   const usersQuery = useMemoFirebase(() => {
-    if (!db || !isRegistryAdmin) return null;
+    if (!db) return null;
     return collection(db, "users");
-  }, [db, isRegistryAdmin]);
+  }, [db]);
   const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
   const callsignRequestsQuery = useMemoFirebase(() => {
-    if (!db || !isRegistryAdmin) return null;
+    if (!db) return null;
     return collection(db, "callsignRequests");
-  }, [db, isRegistryAdmin]);
+  }, [db]);
   const { data: callsignRequests } = useCollection(callsignRequestsQuery);
 
   const sessionRequestsQuery = useMemoFirebase(() => {
-    if (!db || !isRegistryAdmin) return null;
+    if (!db) return null;
     return collection(db, "sessionRequests");
-  }, [db, isRegistryAdmin]);
+  }, [db]);
   const { data: sessionRequests } = useCollection(sessionRequestsQuery);
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!db || !isRegistryAdmin) return null;
+    if (!db) return null;
     return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
-  }, [db, isRegistryAdmin]);
+  }, [db]);
   const { data: messages } = useCollection(messagesQuery);
 
   const gatewayRef = useMemoFirebase(() => {
-    if (!db || !isRegistryAdmin) return null;
+    if (!db) return null;
     return doc(db, "gateway", "default");
-  }, [db, isRegistryAdmin]);
+  }, [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
   const handleUpdateGateway = (type: 'user' | 'admin') => {
@@ -107,12 +108,10 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
   };
 
   const handleApproveCallsign = async (request: any) => {
-    // Update main operative registry
     updateDocumentNonBlocking(doc(db, "users", request.userId), {
       callsign: request.requestedCallsign
     });
 
-    // Check if this user is an admin and update their command role callsign as well
     const adminRoleRef = doc(db, "roles_admin", request.userId);
     try {
       const adminSnap = await getDoc(adminRoleRef);
@@ -122,11 +121,11 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
         });
       }
     } catch (e) {
-      // Not an admin or permission error, ignore role update
+      // Ignore
     }
 
     deleteDocumentNonBlocking(doc(db, "callsignRequests", request.id));
-    toast({ title: "IDENTITY_SHIFT_AUTHORIZED", description: `Subject ${request.currentCallsign} is now ${request.requestedCallsign}` });
+    toast({ title: "IDENTITY_SHIFT_AUTHORIZED" });
   };
 
   const handleApproveSession = (request: any) => {
@@ -152,7 +151,6 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     e.preventDefault();
     if (!broadcastInput.trim() || !user) return;
 
-    // Get current admin callsign
     const adminUser = users?.find(u => u.id === user.uid);
     const senderName = adminUser?.callsign || "WARRIOR";
 
@@ -165,19 +163,8 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     });
 
     setBroadcastInput("");
-    toast({ title: "MESSAGE_TRANSMITTED", description: messageRecipient === 'ALL' ? "Global broadcast sent." : `Direct message sent to ${messageRecipient}.` });
+    toast({ title: "MESSAGE_TRANSMITTED" });
   };
-
-  if (!isRegistryAdmin) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <p className="text-primary font-mono text-xs tracking-widest animate-pulse">PROVISIONING_COMMAND_AUTHORITY...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-fade-in">
@@ -187,9 +174,17 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
             <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.5.0</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
-            <X className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center space-x-2">
+            {onReturnToChat && (
+              <Button variant="outline" size="sm" onClick={onReturnToChat} className="text-[10px] border-primary/30 text-primary h-8">
+                <LayoutDashboard className="w-3 h-3 mr-2" />
+                OPERATIVE_VIEW
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive h-8 w-8">
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
         </CardHeader>
         
         <CardContent className="flex-1 overflow-hidden p-6">
@@ -199,7 +194,7 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
               <TabsTrigger value="members" className="text-[10px]">OPERATIVE_REGISTRY</TabsTrigger>
               <TabsTrigger value="requests" className="text-[10px]">IDENTITY_TASKS</TabsTrigger>
               <TabsTrigger value="comms" className="text-[10px]">COMMS_HUB</TabsTrigger>
-              <TabsTrigger value="system" className="text-[10px]">SYSTEM_CONFIG</TabsTrigger>
+              {isRegistryAdmin && <TabsTrigger value="system" className="text-[10px]">SYSTEM_CONFIG</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="sessions" className="flex-1 overflow-auto">
@@ -278,11 +273,6 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {usersLoading && (
-                     <TableRow>
-                       <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">LOADING_REGISTRY...</TableCell>
-                     </TableRow>
-                  )}
                 </TableBody>
               </Table>
             </TabsContent>
@@ -311,11 +301,6 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {callsignRequests?.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center py-12 opacity-30 text-[10px]">NO_PENDING_IDENTITY_REQUESTS</TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
             </TabsContent>
@@ -323,31 +308,24 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
             <TabsContent value="comms" className="flex-1 flex flex-col space-y-4 overflow-hidden">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
                 <div className="lg:col-span-2 flex flex-col bg-secondary/10 border border-border rounded-lg overflow-hidden">
-                  <div className="p-3 border-b border-border bg-secondary/20 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <History className="w-4 h-4 text-primary" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Global_Comms_Archive</span>
-                    </div>
-                    <Badge variant="outline" className="text-[8px] opacity-50 uppercase tracking-tighter">Read Only Access</Badge>
+                  <div className="p-3 border-b border-border bg-secondary/20 flex items-center">
+                    <History className="w-4 h-4 text-primary mr-2" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Global_Comms_Archive</span>
                   </div>
                   <ScrollArea className="flex-1 p-4">
                     <div className="space-y-4">
                       {messages?.map((msg) => (
                         <div key={msg.id} className="flex flex-col space-y-1">
                           <div className="flex items-center space-x-2 text-[9px] uppercase font-bold tracking-tighter opacity-60">
-                            <span className={msg.sender === 'WARRIOR' || msg.sender === 'SYSTEM' ? 'text-primary' : ''}>{msg.sender}</span>
+                            <span className={msg.sender === 'WARRIOR' ? 'text-primary' : ''}>{msg.sender}</span>
                             <span className="opacity-40">→</span>
                             <span className="opacity-70">{msg.recipient}</span>
-                            <span className="opacity-40 ml-auto">{msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ''}</span>
                           </div>
-                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' || msg.sender === 'SYSTEM' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
+                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
                             {msg.content}
                           </div>
                         </div>
                       ))}
-                      {messages?.length === 0 && (
-                        <div className="text-center py-20 opacity-20 text-[10px] uppercase">No archives detected</div>
-                      )}
                     </div>
                   </ScrollArea>
                 </div>
@@ -363,13 +341,10 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                     <CardContent className="px-4 pb-4">
                       <form onSubmit={handleSendMessage} className="space-y-4">
                         <div className="space-y-2">
-                          <label className="text-[9px] uppercase opacity-50 flex items-center">
-                            <Target className="w-3 h-3 mr-1" />
-                            Target Recipient
-                          </label>
+                          <label className="text-[9px] uppercase opacity-50">Target Recipient</label>
                           <Select value={messageRecipient} onValueChange={setMessageRecipient}>
                             <SelectTrigger className="h-8 text-[10px] bg-background border-border">
-                              <SelectValue placeholder="Select Recipient" />
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-card border-border">
                               <SelectItem value="ALL" className="text-[10px]">ALL (BROADCAST)</SelectItem>
@@ -379,16 +354,12 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                             </SelectContent>
                           </Select>
                         </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[9px] uppercase opacity-50">Transmission Content</label>
-                          <textarea
-                            value={broadcastInput}
-                            onChange={(e) => setBroadcastInput(e.target.value)}
-                            placeholder="Enter command data..."
-                            className="w-full h-32 bg-background border border-border rounded p-3 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
-                          />
-                        </div>
+                        <textarea
+                          value={broadcastInput}
+                          onChange={(e) => setBroadcastInput(e.target.value)}
+                          placeholder="Enter command data..."
+                          className="w-full h-32 bg-background border border-border rounded p-3 text-xs font-mono focus:ring-1 focus:ring-primary outline-none"
+                        />
                         <Button type="submit" disabled={!broadcastInput.trim()} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-9">
                           <Send className="w-4 h-4 mr-2" />
                           TRANSMIT_DATA
@@ -400,56 +371,53 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
               </div>
             </TabsContent>
 
-            <TabsContent value="system" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="bg-secondary/20 border-border">
-                  <CardHeader className="flex flex-row items-center space-x-2">
-                    <Globe className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xs uppercase text-primary">Gateway Sequences</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase opacity-50">Operative Entrance (Oracle)</label>
-                      <div className="flex space-x-2">
-                        <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder={gatewayData?.gatewayAddress || "raven.oracle"} className="font-mono text-xs h-8" />
-                        <Button onClick={() => handleUpdateGateway('user')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+            {isRegistryAdmin && (
+              <TabsContent value="system" className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="bg-secondary/20 border-border">
+                    <CardHeader className="flex flex-row items-center space-x-2">
+                      <Globe className="w-4 h-4 text-primary" />
+                      <CardTitle className="text-xs uppercase text-primary">Gateway Sequences</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase opacity-50">Operative Entrance</label>
+                        <div className="flex space-x-2">
+                          <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder={gatewayData?.gatewayAddress || "raven.oracle"} className="font-mono text-xs h-8" />
+                          <Button onClick={() => handleUpdateGateway('user')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase opacity-50">Command Entrance (Admin Bypass)</label>
-                      <div className="flex space-x-2">
-                        <Input value={newAdminGateway} onChange={(e) => setNewAdminGateway(e.target.value)} placeholder={gatewayData?.adminAddress || "raven.admin"} className="font-mono text-xs h-8" />
-                        <Button onClick={() => handleUpdateGateway('admin')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase opacity-50">Command Entrance</label>
+                        <div className="flex space-x-2">
+                          <Input value={newAdminGateway} onChange={(e) => setNewAdminGateway(e.target.value)} placeholder={gatewayData?.adminAddress || "raven.admin"} className="font-mono text-xs h-8" />
+                          <Button onClick={() => handleUpdateGateway('admin')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
 
-                <Card className="bg-secondary/20 border-border">
-                  <CardHeader className="flex flex-row items-center space-x-2">
-                    <UserRound className="w-4 h-4 text-primary" />
-                    <CardTitle className="text-xs uppercase text-primary">Operative Provisioning</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-[9px] opacity-50 uppercase mb-2">Generate encryption keys for new subject recruitment.</p>
-                    <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>
-                    {inviteLink && (
-                      <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2 animate-in zoom-in-95">
-                        <Input readOnly value={inviteLink} className="text-[9px] font-mono h-6" />
-                        <Button size="sm" onClick={() => {
-                          navigator.clipboard.writeText(inviteLink);
-                          toast({ title: "ENCRYPTION_LINK_COPIED" });
-                        }} className="h-6 text-[9px]">COPY</Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+                  <Card className="bg-secondary/20 border-border">
+                    <CardHeader className="flex flex-row items-center space-x-2">
+                      <UserRound className="w-4 h-4 text-primary" />
+                      <CardTitle className="text-xs uppercase text-primary">Operative Provisioning</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>
+                      {inviteLink && (
+                        <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2">
+                          <Input readOnly value={inviteLink} className="text-[9px] font-mono h-6" />
+                          <Button size="sm" onClick={() => navigator.clipboard.writeText(inviteLink)} className="h-6 text-[9px]">COPY</Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            )}
           </Tabs>
         </CardContent>
       </Card>
     </div>
   );
 }
-

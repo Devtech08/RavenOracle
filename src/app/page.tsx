@@ -53,7 +53,14 @@ function RavenOracleApp() {
       if (isSystemAdmin) {
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
         setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
-        setPhase("admin");
+        
+        // If they used the admin gate, go straight to Admin Terminal
+        // If they used the user gate, go to Chat as a "normal user" first
+        if (isAdminEntry) {
+          setPhase("admin");
+        } else {
+          setPhase("chat");
+        }
       } else {
         setSessionData({ callsign: finalCallsign, key });
         setPhase("chat");
@@ -62,7 +69,7 @@ function RavenOracleApp() {
   };
 
   const handleToggleAdmin = () => {
-    if (isAdmin) {
+    if (isAdmin || isAdminEntry || sessionData?.callsign === "WARRIOR") {
       setPhase(phase === "admin" ? "chat" : "admin");
     }
   };
@@ -92,15 +99,16 @@ function RavenOracleApp() {
           callsign={sessionData.callsign}
           sessionKey={sessionData.key} 
           onLogout={handleSessionEnd} 
-          isAdmin={isAdmin}
+          isAdmin={isAdmin || isAdminEntry || sessionData.callsign === "WARRIOR"}
           onOpenAdmin={handleToggleAdmin}
         />
       )}
 
       {phase === "admin" && (isAdmin || isAdminEntry || sessionData?.callsign === "WARRIOR") && (
         <AdminPanel 
-          isRegistryAdmin={true}
+          isRegistryAdmin={isAdmin}
           onClose={handleSessionEnd} 
+          onReturnToChat={handleToggleAdmin}
         />
       )}
       

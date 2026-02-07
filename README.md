@@ -13,8 +13,9 @@ A high-security, futuristic communication platform designed for discrete operati
 - **Typography**: Source Code Pro (Monospace focus)
 
 ## 🎨 Branding
-The portal uses a custom identity link. To update the main gateway emblem:
-- Upload your logo to `public/logo.jpeg`.
+To update the main gateway emblem:
+- Upload your logo file to the root `public/` directory.
+- Ensure the filename is exactly `logo.jpeg`.
 
 ## 🔑 Access Control & Identity
 
@@ -38,21 +39,6 @@ To ensure maximum security, standard operatives must undergo the following seque
 5.  **Session Code Unlock**: Enter the unique 4-digit numeric code provided by the Oracle upon approval.
 
 *Note: Administrators (WARRIOR) bypass stages 3-5 for rapid response capabilities.*
-
-## 🛡️ Feature Breakdown
-
-### 1. Secure Communication Hub
-- **Targeted Messaging**: Users can broadcast to `ALL` or target specific callsigns.
-- **File Transmissions**: Securely attach and share data fragments (images or documents) within the communication stream.
-- **Session-Locked History**: Operatives only see communications transmitted since their specific session began. History is purged locally on termination.
-- **Command Broadcasts**: Administrators can transmit priority orders to individuals or the entire team.
-
-### 2. Command Terminal (Admin Panel)
-- **Access Queues**: Manage and authorize pending session requests from operatives.
-- **Operative Registry**: Full view of all registered subjects and their status.
-- **Termination Control**: Only admins can instantly block or purge any operative, forcing an immediate session disconnect.
-- **Identity Tasks**: Authorize or reject requested callsign shifts.
-- **System Config**: Update gateway sequences and provision invite-only biometric links.
 
 ---
 *The shadows hold your secrets. Encrypted end-to-end.*

@@ -12,6 +12,7 @@ interface GatewayScreenProps {
 export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
+  const [logoExists, setLogoExists] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
 
@@ -47,16 +48,21 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-8 flex flex-col items-center justify-center group">
         {/* Custom Logo Integration - Linked to /public/logo.jpeg */}
-        <div className="mb-4 relative w-28 h-28 flex items-center justify-center overflow-hidden">
-          <img 
-            src="/logo.jpeg" 
-            alt="ORACLE_LOGO" 
-            className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_15px_rgba(0,255,255,0.4)]"
-            onError={(e) => {
-              // Hide if logo not found
-              (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
-            }}
-          />
+        <div className="mb-6 relative w-32 h-32 flex flex-col items-center justify-center">
+          {logoExists ? (
+            <img 
+              src="/logo.jpeg" 
+              alt="ORACLE_LOGO" 
+              className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
+              onError={() => setLogoExists(false)}
+            />
+          ) : (
+            <div className="w-full h-full border border-dashed border-primary/30 rounded-full flex items-center justify-center animate-pulse">
+               <span className="text-[8px] text-primary/40 text-center px-4 uppercase tracking-[0.3em]">
+                 Identity_Link_Required<br/>[Drop logo.jpeg into public/]
+               </span>
+            </div>
+          )}
         </div>
 
         <div className="relative w-24 h-24 flex items-center justify-center">

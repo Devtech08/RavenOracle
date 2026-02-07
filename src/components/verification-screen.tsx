@@ -54,8 +54,6 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     setIsLoading(true);
     try {
       if (isAdminMode) {
-        // Even the admin must state their callsign.
-        // If the sequence was raven.admin, we proceed with the stated callsign as a bypass.
         onVerify(callsign.toUpperCase(), "ADMIN_BYPASS");
         return;
       }
@@ -142,7 +140,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   };
 
   return (
-    <div className="w-full max-sm p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
+    <div className="w-full max-w-lg p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
           {isAdminMode ? (
@@ -161,92 +159,94 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         </p>
       </div>
 
-      {step === "callsign" && (
-        <form onSubmit={handleInitialSubmit} className="space-y-4">
-          <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="CALLSIGN"
-              value={callsign}
-              onChange={(e) => setCallsign(e.target.value.toUpperCase())}
-              className="pl-10 bg-secondary/50 border-border text-center tracking-widest uppercase"
-              autoFocus
-            />
-          </div>
-          <Button 
-            type="submit" 
-            disabled={isLoading || !callsign}
-            className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
-          >
-            {isLoading ? <Loader2 className="animate-spin" /> : isAdminMode ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
-          </Button>
-        </form>
-      )}
-
-      {step === "biometric" && (
-        <div className="space-y-4">
-          <FaceCapture onCapture={handleFaceCapture} />
-          <Button 
-            onClick={handleRegistrationComplete}
-            disabled={isLoading || !faceData}
-            className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground"
-          >
-            {isLoading ? <Loader2 className="animate-spin" /> : "FINALIZE_BIOMETRICS"}
-          </Button>
-        </div>
-      )}
-
-      {step === "wait_approval" && (
-        <div className="flex flex-col items-center justify-center p-8 space-y-4 border border-dashed border-border rounded-lg bg-secondary/20">
-          <Loader2 className="w-12 h-12 text-primary animate-spin opacity-50" />
-          <div className="text-center">
-            <p className="text-xs font-bold text-primary animate-pulse">TRANSMITTING_TO_WARRIOR...</p>
-            <p className="text-[10px] opacity-40 mt-2">Request ID: {requestId}</p>
-          </div>
-          <p className="text-[9px] text-center text-muted-foreground">Awaiting operative clearance. Do not terminate session.</p>
-        </div>
-      )}
-
-      {step === "final_verification" && (
-        <div className="space-y-6">
-          <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
-             <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
-             <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
-             <p className="text-[10px] opacity-60">Identity validation successful</p>
-          </div>
-          
-          {!shouldSkipFacial && !faceData && (
-             <div className="py-2">
-                <FaceCapture onCapture={handleFaceCapture} label="ACCESS_VALIDATION" />
-             </div>
-          )}
-
-          <form onSubmit={handleFinalVerify} className="space-y-4">
-            {(shouldSkipFacial || faceData) && (
-              <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
-                {requestData?.sessionCode}
-              </div>
-            )}
-            <Input
-              type="password"
-              placeholder="ENTER_SESSION_CODE"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="bg-secondary/50 border-border text-center tracking-widest"
-              autoFocus
-              disabled={!shouldSkipFacial && !faceData}
-            />
+      <div className="max-w-sm mx-auto w-full space-y-6">
+        {step === "callsign" && (
+          <form onSubmit={handleInitialSubmit} className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="CALLSIGN"
+                value={callsign}
+                onChange={(e) => setCallsign(e.target.value.toUpperCase())}
+                className="pl-10 bg-secondary/50 border-border text-center tracking-widest uppercase h-12"
+                autoFocus
+              />
+            </div>
             <Button 
               type="submit" 
-              disabled={!shouldSkipFacial && !faceData}
+              disabled={isLoading || !callsign}
               className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
             >
-              ENTER_PORTAL
+              {isLoading ? <Loader2 className="animate-spin" /> : isAdminMode ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
             </Button>
           </form>
-        </div>
-      )}
+        )}
+
+        {step === "biometric" && (
+          <div className="space-y-4">
+            <FaceCapture onCapture={handleFaceCapture} />
+            <Button 
+              onClick={handleRegistrationComplete}
+              disabled={isLoading || !faceData}
+              className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground"
+            >
+              {isLoading ? <Loader2 className="animate-spin" /> : "FINALIZE_BIOMETRICS"}
+            </Button>
+          </div>
+        )}
+
+        {step === "wait_approval" && (
+          <div className="flex flex-col items-center justify-center p-8 space-y-4 border border-dashed border-border rounded-lg bg-secondary/20">
+            <Loader2 className="w-12 h-12 text-primary animate-spin opacity-50" />
+            <div className="text-center">
+              <p className="text-xs font-bold text-primary animate-pulse">TRANSMITTING_TO_WARRIOR...</p>
+              <p className="text-[10px] opacity-40 mt-2">Request ID: {requestId}</p>
+            </div>
+            <p className="text-[9px] text-center text-muted-foreground">Awaiting operative clearance. Do not terminate session.</p>
+          </div>
+        )}
+
+        {step === "final_verification" && (
+          <div className="space-y-6">
+            <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
+               <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
+               <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
+               <p className="text-[10px] opacity-60">Identity validation successful</p>
+            </div>
+            
+            {!shouldSkipFacial && !faceData && (
+               <div className="py-2">
+                  <FaceCapture onCapture={handleFaceCapture} label="ACCESS_VALIDATION" />
+               </div>
+            )}
+
+            <form onSubmit={handleFinalVerify} className="space-y-4">
+              {(shouldSkipFacial || faceData) && (
+                <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
+                  {requestData?.sessionCode}
+                </div>
+              )}
+              <Input
+                type="password"
+                placeholder="ENTER_SESSION_CODE"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="bg-secondary/50 border-border text-center tracking-widest h-12"
+                autoFocus
+                disabled={!shouldSkipFacial && !faceData}
+              />
+              <Button 
+                type="submit" 
+                disabled={!shouldSkipFacial && !faceData}
+                className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
+              >
+                ENTER_PORTAL
+              </Button>
+            </form>
+          </div>
+        )}
+      </div>
 
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />

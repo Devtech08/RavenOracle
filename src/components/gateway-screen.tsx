@@ -4,8 +4,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
-import Image from "next/image";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 interface GatewayScreenProps {
   onUnlock: (isAdminMode: boolean) => void;
@@ -19,8 +17,6 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
-
-  const ravenEmblem = PlaceHolderImages.find(img => img.id === "raven-emblem");
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -55,24 +51,12 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
           raven
         </span>
         <div className="relative w-32 h-32 flex items-center justify-center">
-          {ravenEmblem ? (
-            <div className="relative w-full h-full animate-pulse transition-transform duration-500 group-hover:scale-110">
-              <Image 
-                src={ravenEmblem.imageUrl} 
-                alt={ravenEmblem.description}
-                fill
-                className="object-contain filter grayscale invert brightness-200 contrast-150 drop-shadow-[0_0_15px_hsl(180,100%,50%,0.5)]"
-                data-ai-hint={ravenEmblem.imageHint}
-              />
-            </div>
-          ) : (
-            <div className="relative flex items-baseline space-x-1">
-              <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
-                &gt;
-              </span>
-              <span className="w-8 h-2 bg-primary animate-pulse shadow-[0_0_15px_hsl(180,100%,50%)]" />
-            </div>
-          )}
+          <div className="relative flex items-baseline space-x-1">
+            <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
+              &gt;
+            </span>
+            <span className="w-8 h-2 bg-primary animate-pulse shadow-[0_0_15px_hsl(180,100%,50%)]" />
+          </div>
         </div>
       </div>
 

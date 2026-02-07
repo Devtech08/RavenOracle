@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Raven Oracle | Secure Communication',
+  title: 'Raven Oracle | Secure Communication Portal',
   description: 'The shadows hold your secrets. Encrypted end-to-end.',
 };
 

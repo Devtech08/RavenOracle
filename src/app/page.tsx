@@ -37,11 +37,11 @@ function RavenOracleApp() {
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
     if (user) {
-      const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin;
+      // "WARRIOR" is the designated admin callsign
+      const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
-      const userRef = doc(db, "users", user.uid);
-      setDoc(userRef, {
+      setDoc(doc(db, "users", user.uid), {
         id: user.uid,
         callsign: finalCallsign,
         registrationDate: new Date().toISOString(),
@@ -51,10 +51,13 @@ function RavenOracleApp() {
 
       if (isSystemAdmin) {
         setDoc(doc(db, "roles_admin", user.uid), { enabled: true }, { merge: true });
+        setSessionData({ callsign: finalCallsign, key });
+        // Admins go straight to the admin portal
+        setPhase("admin");
+      } else {
+        setSessionData({ callsign: finalCallsign, key });
+        setPhase("chat");
       }
-
-      setSessionData({ callsign: finalCallsign, key });
-      setPhase("chat");
     }
   };
 
@@ -71,14 +74,14 @@ function RavenOracleApp() {
 
   if (isUserLoading || (user && isAdminLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background font-body text-primary animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-background font-body text-primary animate-pulse tracking-[0.5em]">
         INITIALIZING_ORACLE...
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-background">
       {phase === "gateway" && <GatewayScreen onUnlock={handleGatewaySuccess} />}
       
       {phase === "verification" && <VerificationScreen onVerify={handleVerificationSuccess} />}
@@ -99,9 +102,10 @@ function RavenOracleApp() {
         />
       )}
       
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] opacity-20">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[150px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary rounded-full blur-[150px]" />
+      {/* Background Ambience */}
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] opacity-30">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-secondary/10 rounded-full blur-[120px]" />
       </div>
     </main>
   );

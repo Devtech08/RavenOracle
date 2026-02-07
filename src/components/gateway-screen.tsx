@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Terminal } from "lucide-react";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 
@@ -16,7 +15,6 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
 
-  // Fetch dynamic gateway sequence from Firestore
   const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
@@ -41,45 +39,50 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md p-8 animate-fade-in">
-      <div className="mb-8 relative group">
-        <div className="absolute inset-0 bg-primary opacity-20 blur-2xl group-hover:opacity-40 transition-opacity" />
-        <Terminal className="w-16 h-16 text-primary glow-cyan relative z-10" />
+    <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
+      {/* Visual Header Icon from Screenshot */}
+      <div className="mb-12 flex items-center justify-center">
+        <div className="relative flex items-baseline space-x-1">
+          <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
+            &gt;
+          </span>
+          <span className="w-8 h-2 bg-primary animate-pulse shadow-[0_0_15px_hsl(180,100%,50%)]" />
+        </div>
       </div>
 
-      <div className="w-full bg-secondary border border-border p-6 rounded-lg shadow-2xl space-y-4">
-        <div className="flex items-center space-x-2 text-primary text-sm opacity-80">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+      <div className="w-full max-w-md bg-[#0a0510]/80 border border-primary/20 p-8 rounded-sm shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+        <div className="flex items-center space-x-2 text-primary text-[11px] font-bold tracking-widest uppercase mb-6">
+          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_hsl(180,100%,50%)] animate-pulse" />
           <span>GATEWAY_STATUS: ACTIVE</span>
         </div>
         
-        <p className="text-muted-foreground text-sm leading-relaxed">
+        <p className="text-muted-foreground text-sm leading-relaxed mb-8 opacity-80">
           The shadows await. To proceed, identify yourself to the Oracle.
         </p>
 
-        <form onSubmit={handleSubmit} className="relative mt-4">
-          <div className="flex items-center space-x-2 font-mono text-lg">
-            <span className="text-primary">$</span>
+        <form onSubmit={handleSubmit} className="relative">
+          <div className="flex items-center space-x-3 font-mono text-lg">
+            <span className="text-primary font-bold">$</span>
             <input
               ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className={`bg-transparent border-none outline-none flex-1 text-foreground placeholder:text-muted/30 ${error ? 'text-destructive' : ''}`}
+              className={`bg-transparent border-none outline-none flex-1 text-foreground placeholder:text-muted/20 ${error ? 'text-destructive' : ''} tracking-wider`}
               placeholder="type sequence..."
               autoFocus
             />
             <span className="terminal-cursor" />
           </div>
           {error && (
-            <p className="text-destructive text-xs mt-2 animate-bounce">
+            <p className="text-destructive text-[10px] mt-4 font-bold tracking-tighter uppercase animate-bounce">
               ACCESS_DENIED: SEQUENCE_MISMATCH
             </p>
           )}
         </form>
       </div>
 
-      <p className="mt-8 text-muted-foreground text-[10px] tracking-widest uppercase opacity-50">
+      <p className="mt-12 text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
         Requires Oracle Authentication Sequence
       </p>
     </div>

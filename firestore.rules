@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // System identifier for rule deployment: v1.5.0
+    // System identifier for rule deployment: v1.6.0
     function isSignedIn() {
       return request.auth != null;
     }
@@ -17,8 +17,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isOwner(userId);
       // Only admins can update sensitive fields like isAdmin or isBlocked.
       // Owners can only update their own profile fields.
@@ -35,18 +34,15 @@ service cloud.firestore {
     }
 
     match /accessKeys/{accessKeyId} {
-      allow get: if isSignedIn();
-      allow list, create, delete: if isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, delete: if isAdmin();
       allow update: if isSignedIn();
     }
 
     match /messageLogs/{messageLogId} {
       allow create: if isSignedIn();
-      allow list, get: if isAdmin() || (isSignedIn() && (
-        resource.data.recipient == "ALL" || 
-        resource.data.userId == request.auth.uid ||
-        resource.data.recipient == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.callsign
-      ));
+      // Allow operatives to list the comms archive once past the gateway.
+      allow list, get: if isSignedIn();
     }
 
     match /roles_admin/{userId} {
@@ -55,15 +51,13 @@ service cloud.firestore {
     }
 
     match /callsignRequests/{requestId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
 
     match /sessionRequests/{requestId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }

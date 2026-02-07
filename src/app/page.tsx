@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,14 +6,22 @@ import { VerificationScreen } from "@/components/verification-screen";
 import { ChatRoom } from "@/components/chat-room";
 import { AdminPanel } from "@/components/admin-panel";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
-import { useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
   const [sessionData, setSessionData] = useState<{ callsign: string; key: string } | null>(null);
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
+  const auth = useAuth();
+
+  // Ensure user is signed in anonymously to interact with basic Firestore rules
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [user, isUserLoading, auth]);
 
   // Check if current user is admin
   const adminDocRef = useMemoFirebase(() => {
@@ -30,6 +37,18 @@ function RavenOracleApp() {
   };
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
+    // Finalize user registration in Firestore
+    if (user) {
+      const userRef = doc(db, "users", user.uid);
+      setDoc(userRef, {
+        id: user.uid,
+        callsign: callsign.toUpperCase(),
+        registrationDate: new Date().toISOString(),
+        isAdmin: false,
+        isBlocked: false
+      }, { merge: true });
+    }
+
     setSessionData({ callsign, key });
     setPhase("chat");
   };
@@ -45,9 +64,9 @@ function RavenOracleApp() {
     setPhase("gateway");
   };
 
-  if (isUserLoading || isAdminLoading) {
+  if (isUserLoading || (user && isAdminLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background font-mono text-primary animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-background font-body text-primary animate-pulse">
         INITIALIZING_ORACLE...
       </div>
     );

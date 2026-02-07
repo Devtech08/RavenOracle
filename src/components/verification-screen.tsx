@@ -1,12 +1,11 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, Key, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, initiateAnonymousSignIn, useAuth } from "@/firebase";
+import { useFirestore } from "@/firebase";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 
 interface VerificationScreenProps {
@@ -19,7 +18,15 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const db = useFirestore();
-  const auth = useAuth();
+
+  // Check for invite code in URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get("invite");
+    if (invite) {
+      setCode(invite);
+    }
+  }, []);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,16 +43,13 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
       if (!querySnapshot.empty || code === "ADMIN_BYPASS") {
         const keyDoc = querySnapshot.docs[0];
         
-        // Mark key as used if not bypass
+        // Mark key as used if it's a real document (not bypass)
         if (keyDoc) {
           await updateDoc(doc(db, "accessKeys", keyDoc.id), {
             isUsed: true,
             usedAt: new Date().toISOString()
           });
         }
-
-        // Authenticate anonymously for the session
-        initiateAnonymousSignIn(auth);
         
         onVerify(callsign.trim(), code.trim());
       } else {

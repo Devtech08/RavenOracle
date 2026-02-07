@@ -15,8 +15,7 @@ import {
   RefreshCw, 
   X, 
   Link as LinkIcon,
-  Ban,
-  Settings
+  Ban
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";

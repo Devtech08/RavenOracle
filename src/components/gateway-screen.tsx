@@ -15,7 +15,10 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const db = useFirestore();
 
-  const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
+  const gatewayRef = useMemoFirebase(() => {
+    if (!db) return null;
+    return doc(db, "gateway", "default");
+  }, [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-4 flex flex-col items-center justify-center group">
         
-        {/* Isolated Identity Emblem - No text header above as requested */}
+        {/* Identity Emblem */}
         <div className="mb-12 relative w-64 h-64 flex flex-col items-center justify-center bg-transparent overflow-hidden">
           {logoExists ? (
             <img 
@@ -87,8 +90,8 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
           <span>GATEWAY_STATUS: ACTIVE</span>
         </div>
         
-        <p className="text-muted-foreground text-sm leading-relaxed mb-8 opacity-80">
-          State the sequence to proceed.
+        <p className="text-muted-foreground text-sm leading-relaxed mb-8 opacity-80 lowercase">
+          the shadows await, to proceed, i dentify youe=rself to the oracle
         </p>
 
         <form onSubmit={handleSubmit} className="relative">
@@ -117,7 +120,6 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
         <p className="text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
           Requires Oracle Authentication
         </p>
-        {/* Added WARRIOR signature below as requested */}
         <p className="text-primary text-[11px] tracking-[0.5em] uppercase opacity-40 font-bold glow-cyan">
           WARRIOR
         </p>

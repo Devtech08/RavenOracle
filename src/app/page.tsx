@@ -24,7 +24,7 @@ function RavenOracleApp() {
 
   // Persistence: Restore state on mount
   useEffect(() => {
-    const saved = localStorage.getItem("raven_oracle_session_v3");
+    const saved = localStorage.getItem("raven_oracle_session_v4");
     if (saved) {
       try {
         const { phase: p, isAdminEntry: i, sessionData: s } = JSON.parse(saved);
@@ -41,7 +41,7 @@ function RavenOracleApp() {
   // Persistence: Save state on change
   useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("raven_oracle_session_v3", JSON.stringify({
+      localStorage.setItem("raven_oracle_session_v4", JSON.stringify({
         phase,
         isAdminEntry,
         sessionData
@@ -103,7 +103,7 @@ function RavenOracleApp() {
       setPhase("gateway");
       setSessionData(null);
       setIsAdminEntry(false);
-      localStorage.removeItem("raven_oracle_session_v3");
+      localStorage.removeItem("raven_oracle_session_v4");
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 
@@ -151,7 +151,7 @@ function RavenOracleApp() {
     setSessionData(null);
     setIsAdminEntry(false);
     setPhase("gateway");
-    localStorage.removeItem("raven_oracle_session_v3");
+    localStorage.removeItem("raven_oracle_session_v4");
   };
 
   if (isUserLoading || !isHydrated) {

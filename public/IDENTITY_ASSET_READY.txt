@@ -1,0 +1,2 @@
+The public folder is active. 
+Drop your logo.jpeg here to brand the gateway.

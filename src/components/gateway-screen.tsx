@@ -46,7 +46,10 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       {/* Visual Header Icon */}
-      <div className="mb-12 flex items-center justify-center">
+      <div className="mb-12 flex flex-col items-center justify-center group">
+        <span className="text-[10px] tracking-[1.2em] uppercase text-primary opacity-40 mb-4 font-bold transition-opacity group-hover:opacity-100">
+          raven
+        </span>
         <div className="relative flex items-baseline space-x-1">
           <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
             &gt;

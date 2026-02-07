@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp, getDocs } from "firebase/firestore";
+import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp } from "firebase/firestore";
 
 interface ChatRoomProps {
   callsign: string;
@@ -102,7 +102,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1024 * 1024) {
-        toast({ variant: "destructive", title: "FILE_TOO_LARGE", description: "Secure transmissions are limited to 1MB." });
+        toast({ variant: "destructive", title: "FILE_TOO_LARGE", description: "Secure transmissions capped at 1MB." });
         return;
       }
       const reader = new FileReader();
@@ -119,16 +119,13 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!input.trim() && !selectedFile) || !user) return;
+    if ((!input.trim() && !selectedFile) || !user || !db) return;
 
-    const messageContent = input.trim();
-    const target = recipientInput.trim().toUpperCase();
-    
     const messageData: any = {
       sender: currentCallsign,
       userId: user.uid,
-      recipient: target,
-      content: messageContent,
+      recipient: recipientInput.trim().toUpperCase(),
+      content: input.trim(),
       timestamp: serverTimestamp()
     };
 
@@ -139,7 +136,6 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     }
 
     addDocumentNonBlocking(collection(db, "messageLogs"), messageData);
-
     setInput("");
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -152,7 +148,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     const cleanNewCallsign = newCallsign.trim().toUpperCase();
 
     if (isAdmin) {
-      // WARRIOR autonomy: Instant shift
+      // Admin autonomy: Immediate registry update
       updateDocumentNonBlocking(doc(db, "users", user.uid), {
         callsign: cleanNewCallsign
       });
@@ -162,13 +158,12 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
       toast({ 
         title: "IDENTITY_SHIFTED", 
-        description: `Active callsign successfully shifted to ${cleanNewCallsign}.` 
+        description: `Active callsign successfully updated to ${cleanNewCallsign}.` 
       });
     } else {
-      // Operative level: Requires explicit review
-      const requestId = Math.random().toString(36).substring(7);
+      // Operative level: Await review
       addDocumentNonBlocking(collection(db, "callsignRequests"), {
-        id: requestId,
+        id: Math.random().toString(36).substring(7),
         userId: user.uid,
         currentCallsign: currentCallsign,
         requestedCallsign: cleanNewCallsign,

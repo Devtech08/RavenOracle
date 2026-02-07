@@ -33,7 +33,6 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   const inviteKey = searchParams.get("invite");
   const isWarriorCallsign = callsign.trim().toUpperCase() === "WARRIOR";
   
-  // Check if admin already exists
   const adminsQuery = useMemoFirebase(() => {
     if (!db) return null;
     return collection(db, "roles_admin");
@@ -50,11 +49,10 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
   const { data: requestData } = useDoc(requestRef);
 
-  // Transition from Approval to Biometric
   useEffect(() => {
     if (requestData?.status === "approved" && step === "wait_approval") {
       setStep("biometric");
-      toast({ title: "ACCESS_AUTHORIZED", description: "Warrior has cleared your request. Biometric confirmation required." });
+      toast({ title: "ACCESS_AUTHORIZED", description: "Clearance granted. Biometric scan required." });
     }
   }, [requestData, step, toast]);
 
@@ -65,31 +63,33 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     
     setIsLoading(true);
 
-    // Strict identity check: Access denied if not registered (except first admin)
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDocs(query(collection(db, "users"), where("callsign", "==", cleanCallsign)));
+    const usersQuery = query(collection(db, "users"), where("callsign", "==", cleanCallsign));
+    const userSnap = await getDocs(usersQuery);
     const isRegistered = !userSnap.empty;
 
     if (isFirstAdminRegistration) {
-      // First admin registration requires biometric linkage
       setStep("biometric");
       setIsLoading(false);
       return;
     }
 
     if (isAdminMode && isWarriorCallsign && adminExists) {
-      // Existing admin bypass queue but STILL might need session check
-      onVerify(cleanCallsign, "WARRIOR_ENTRY");
-      return;
-    }
-
-    if (!isRegistered && !inviteKey) {
-      toast({ variant: "destructive", title: "IDENTITY_DENIED", description: "Callsign not found in registry. Invite required." });
+      // Admins skip the queue but still need biometric scan on first-time login
+      setStep("biometric");
       setIsLoading(false);
       return;
     }
 
-    // Normal users create a fresh request every session
+    if (!isRegistered && !inviteKey) {
+      toast({ 
+        variant: "destructive", 
+        title: "IDENTITY_DENIED", 
+        description: "Callsign not in registry. Invite link required." 
+      });
+      setIsLoading(false);
+      return;
+    }
+
     const reqId = Math.random().toString(36).substring(7);
     setDocumentNonBlocking(doc(db, "sessionRequests", reqId), {
       id: reqId,
@@ -108,14 +108,13 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     if (!faceData || !user) return;
     setIsLoading(true);
     
-    // Link visage to session
     setDocumentNonBlocking(doc(db, "users", user.uid), {
       faceData: faceData,
       lastSessionStart: new Date().toISOString()
     }, { merge: true });
 
-    if (isFirstAdminRegistration) {
-      onVerify("WARRIOR", "INITIAL_REGISTRY");
+    if (isAdminMode || isFirstAdminRegistration) {
+      onVerify(callsign.toUpperCase(), "ADMIN_BYPASS");
     } else {
       setStep("final_verification");
     }
@@ -127,7 +126,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     if (code.trim() === requestData?.sessionCode) {
       onVerify(callsign.toUpperCase(), code);
     } else {
-      toast({ variant: "destructive", title: "INVALID_CODE", description: "Unlock code mismatch detected." });
+      toast({ variant: "destructive", title: "INVALID_CODE", description: "Unlock code mismatch." });
     }
   };
 
@@ -149,7 +148,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           {isAdminMode ? "Command Registry" : step === "callsign" ? "Identity Registry" : step === "wait_approval" ? "Approval Queue" : step === "biometric" ? "Biometric Link" : "Access Key"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest leading-relaxed">
-          {isAdminMode ? "Verified bypass active. First-time registration requires visage scan." : 
+          {isAdminMode ? "Verified bypass active. First-time login requires visage scan." : 
            step === "callsign" ? "State your callsign for the Oracle's ledger." : 
            step === "wait_approval" ? "Awaiting manual authorization from WARRIOR." : 
            step === "biometric" ? "Link visage to active session." : 
@@ -233,7 +232,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       <div className="pt-4 flex items-start space-x-3 text-[9px] text-muted-foreground border-t border-primary/10">
         <ShieldAlert className="w-3 h-3 text-primary shrink-0 opacity-50" />
         <p className="uppercase tracking-tighter opacity-60 leading-tight">
-          All sessions require manual Warrior authorization and fresh biometric linkage.
+          All sessions require manual Warrior authorization and biometric linkage.
         </p>
       </div>
     </div>

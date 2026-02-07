@@ -22,7 +22,7 @@ function RavenOracleApp() {
   const { toast } = useToast();
   const lastPendingCount = useRef(0);
 
-  // Persistence: Restore state on mount
+  // Persistence: Restore session state on mount
   useEffect(() => {
     const saved = localStorage.getItem("raven_oracle_active_session");
     if (saved) {
@@ -32,13 +32,13 @@ function RavenOracleApp() {
         if (i !== undefined) setIsAdminEntry(i);
         if (s) setSessionData(s);
       } catch (e) {
-        console.error("Failed to restore session state", e);
+        console.error("Failed to restore session", e);
       }
     }
     setIsHydrated(true);
   }, []);
 
-  // Persistence: Save state on change
+  // Persistence: Save session state on change
   useEffect(() => {
     if (isHydrated) {
       localStorage.setItem("raven_oracle_active_session", JSON.stringify({
@@ -49,7 +49,7 @@ function RavenOracleApp() {
     }
   }, [phase, isAdminEntry, sessionData, isHydrated]);
 
-  // Auth: Ensure anonymous session is active
+  // Auth: Initialize anonymous session
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
@@ -70,7 +70,7 @@ function RavenOracleApp() {
 
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
-  // Real-time notification for admins
+  // Real-time admin notifications
   const pendingRequestsQuery = useMemoFirebase(() => {
     if (!db || !user || !isUserAdmin) return null;
     return query(collection(db, "sessionRequests"), where("status", "==", "pending"));
@@ -83,7 +83,7 @@ function RavenOracleApp() {
       if (currentCount > 0 && currentCount > lastPendingCount.current) {
         toast({
           title: "PENDING_AUTHORIZATION",
-          description: `There are ${currentCount} operative(s) awaiting your clearance.`,
+          description: `There are ${currentCount} operative(s) awaiting clearance.`,
           action: (
             <Button 
               variant="outline" 
@@ -100,7 +100,7 @@ function RavenOracleApp() {
     }
   }, [pendingRequests, isUserAdmin, toast, user]);
 
-  // Block logic
+  // Security: Block logic
   useEffect(() => {
     if (userData?.isBlocked && phase !== "gateway") {
       setPhase("gateway");
@@ -110,7 +110,7 @@ function RavenOracleApp() {
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 
-        description: "Your identification has been purged from the active session." 
+        description: "Your identification has been purged from the registry." 
       });
     }
   }, [userData, phase, toast]);
@@ -135,12 +135,10 @@ function RavenOracleApp() {
 
       if (isSystemAdmin) {
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
-        setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
-        setPhase(isAdminEntry ? "admin" : "chat");
-      } else {
-        setSessionData({ callsign: finalCallsign, key });
-        setPhase("chat");
       }
+
+      setSessionData({ callsign: finalCallsign, key });
+      setPhase(isSystemAdmin && isAdminEntry ? "admin" : "chat");
     }
   };
 

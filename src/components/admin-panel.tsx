@@ -20,21 +20,11 @@ import {
   Trash2, 
   X, 
   Ban,
-  Check,
   Zap,
-  Globe,
-  Loader2,
-  MessageSquare,
-  Send,
-  History,
-  Target,
-  UserRound,
+  RotateCcw,
   LayoutDashboard,
   Copy,
-  Plus,
-  RotateCcw,
-  FileIcon,
-  Download
+  Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -80,12 +70,6 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
   }, [db]);
   const { data: messages } = useCollection(messagesQuery);
 
-  const accessKeysQuery = useMemoFirebase(() => {
-    if (!db) return null;
-    return query(collection(db, "accessKeys"), orderBy("createdAt", "desc"));
-  }, [db]);
-  const { data: accessKeys } = useCollection(accessKeysQuery);
-
   const gatewayRef = useMemoFirebase(() => {
     if (!db) return null;
     return doc(db, "gateway", "default");
@@ -108,15 +92,13 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
 
   const handleGenerateInvite = () => {
     const newKey = `KEY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const keyId = Math.random().toString(36).substring(7);
-    setDocumentNonBlocking(doc(db, "accessKeys", keyId), {
+    setDocumentNonBlocking(doc(db, "accessKeys", Math.random().toString(36).substring(7)), {
       accessKey: newKey,
       isUsed: false,
       createdAt: new Date().toISOString()
     }, { merge: false });
     
-    const fullLink = `${window.location.origin}/?invite=${newKey}`;
-    setInviteLink(fullLink);
+    setInviteLink(`${window.location.origin}/?invite=${newKey}`);
     toast({ title: "INVITE_KEY_PROVISIONED" });
   };
 
@@ -124,17 +106,6 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     updateDocumentNonBlocking(doc(db, "users", request.userId), {
       callsign: request.requestedCallsign
     });
-
-    const adminRoleRef = doc(db, "roles_admin", request.userId);
-    try {
-      const adminSnap = await getDoc(adminRoleRef);
-      if (adminSnap.exists()) {
-        updateDocumentNonBlocking(adminRoleRef, {
-          callsign: request.requestedCallsign
-        });
-      }
-    } catch (e) {}
-
     deleteDocumentNonBlocking(doc(db, "callsignRequests", request.id));
     toast({ title: "IDENTITY_SHIFTED" });
   };
@@ -163,7 +134,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!broadcastInput.trim() || !user) return;
+    if (!broadcastInput.trim() || !user || !db) return;
 
     const adminUser = users?.find(u => u.id === user.uid);
     const senderName = adminUser?.callsign || "WARRIOR";
@@ -180,7 +151,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     toast({ title: "MESSAGE_TRANSMITTED" });
   };
 
-  // Deduplicate users for the recipient selection list to avoid key collision errors
+  // Deduplicate users for the recipient list to avoid duplicate keys in Select
   const uniqueRecipientUsers = Array.from(new Set(users?.map(u => u.callsign))).map(callsign => {
     return users?.find(u => u.callsign === callsign);
   }).filter(Boolean);

@@ -10,22 +10,19 @@ import { getFirestore } from 'firebase/firestore'
  * Hardened to prevent the 'app/no-options' error by always utilizing the config object.
  */
 export function initializeFirebase() {
-  // Check if an app is already initialized to avoid "Duplicate App" errors.
   const apps = getApps();
   if (apps.length > 0) {
     return getSdks(apps[0]);
   }
 
-  // Explicitly initialize with the config object to satisfy Hosting detection logic.
   let firebaseApp: FirebaseApp;
   try {
+    // CRITICAL: Always pass firebaseConfig to ensure deployment stability
     firebaseApp = initializeApp(firebaseConfig);
   } catch (e) {
-    // If initialization fails but an app exists, attempt recovery.
     try {
       firebaseApp = getApp();
     } catch {
-      // Final fallback if everything fails.
       firebaseApp = initializeApp(firebaseConfig);
     }
   }

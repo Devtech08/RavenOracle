@@ -26,7 +26,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         setHasCameraPermission(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Start autonomous capture sequence
+          // Trigger autonomous capture sequence
           setCountdown(3);
         }
       } catch (error) {
@@ -35,7 +35,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         toast({
           variant: 'destructive',
           title: 'Camera Access Denied',
-          description: 'Enable camera permissions to proceed.',
+          description: 'Enable camera permissions to proceed with identity verification.',
         });
       }
     };
@@ -113,7 +113,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         <Alert variant="destructive">
           <AlertTitle>Camera Required</AlertTitle>
           <AlertDescription>
-            Identity link requires visual confirmation.
+            Identity link requires visual biometric confirmation.
           </AlertDescription>
         </Alert>
       )}

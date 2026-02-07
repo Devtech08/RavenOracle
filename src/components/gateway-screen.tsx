@@ -49,12 +49,12 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
       <div className="mb-8 flex flex-col items-center justify-center group">
         
         {/* Identity Emblem Container */}
-        <div className="mb-8 relative w-48 h-48 flex flex-col items-center justify-center">
+        <div className="mb-8 relative w-48 h-48 flex flex-col items-center justify-center bg-transparent">
           {logoExists ? (
             <img 
               src="/logo.jpeg" 
               alt="IDENTITY_EMBLEM" 
-              className="w-full h-full object-contain mix-blend-screen opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-105 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
+              className="w-full h-full object-contain mix-blend-screen opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_25px_rgba(0,255,255,0.6)]"
               onError={() => setLogoExists(false)}
             />
           ) : (

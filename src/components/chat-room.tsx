@@ -21,7 +21,8 @@ import {
   User,
   History,
   Target,
-  Settings
+  Settings,
+  Bell
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
@@ -33,9 +34,10 @@ interface ChatRoomProps {
   isAdmin: boolean;
   onLogout: () => void;
   onOpenAdmin: () => void;
+  pendingRequestCount?: number;
 }
 
-export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
+export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLogout, onOpenAdmin, pendingRequestCount = 0 }: ChatRoomProps) {
   const [input, setInput] = useState("");
   const [recipientInput, setRecipientInput] = useState("ALL");
   const [newCallsign, setNewCallsign] = useState("");
@@ -177,15 +179,22 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
           </Dialog>
 
           {isAdmin && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={onOpenAdmin} 
-              className="text-[10px] border-primary/50 text-primary font-bold tracking-widest px-4 h-8 transition-all hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(0,255,255,0.2)]"
-            >
-              <Settings className="w-3.5 h-3.5 mr-2 text-primary" />
-              ADMIN
-            </Button>
+            <div className="relative">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onOpenAdmin} 
+                className="text-[10px] border-primary/50 text-primary font-bold tracking-widest px-4 h-8 transition-all hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(0,255,255,0.2)]"
+              >
+                <Settings className="w-3.5 h-3.5 mr-2 text-primary" />
+                ADMIN
+              </Button>
+              {pendingRequestCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground animate-bounce border border-background shadow-[0_0_5px_rgba(255,0,0,0.5)]">
+                  {pendingRequestCount}
+                </span>
+              )}
+            </div>
           )}
 
           <Button variant="ghost" size="sm" onClick={onLogout} className="text-muted-foreground hover:text-destructive text-[10px] uppercase font-bold">

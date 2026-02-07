@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { GatewayScreen } from "@/components/gateway-screen";
 import { VerificationScreen } from "@/components/verification-screen";
 import { ChatRoom } from "@/components/chat-room";
 import { AdminPanel } from "@/components/admin-panel";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
-import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn, setDocumentNonBlocking } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn, setDocumentNonBlocking, useCollection } from "@/firebase";
+import { doc, collection, query, where } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
@@ -19,6 +20,7 @@ function RavenOracleApp() {
   const db = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
+  const lastPendingCount = useRef(0);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -38,6 +40,39 @@ function RavenOracleApp() {
   }, [db, user]);
   const { data: adminData } = useDoc(adminDocRef);
 
+  // Monitor authorization queue for administrators
+  const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
+
+  const pendingRequestsQuery = useMemoFirebase(() => {
+    if (!db || !isUserAdmin) return null;
+    return query(collection(db, "sessionRequests"), where("status", "==", "pending"));
+  }, [db, isUserAdmin]);
+  const { data: pendingRequests } = useCollection(pendingRequestsQuery);
+
+  // Global Admin Notification Listener
+  useEffect(() => {
+    if (isUserAdmin && pendingRequests) {
+      const currentCount = pendingRequests.length;
+      if (currentCount > 0 && currentCount > lastPendingCount.current) {
+        toast({
+          title: "PENDING_AUTHORIZATION",
+          description: `There are ${currentCount} operative(s) awaiting your clearance in the queue.`,
+          action: (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-[10px] border-primary/50 text-primary"
+              onClick={() => setPhase("admin")}
+            >
+              OPEN_TERMINAL
+            </Button>
+          ),
+        });
+      }
+      lastPendingCount.current = currentCount;
+    }
+  }, [pendingRequests, isUserAdmin, toast]);
+
   // Enforce Termination: If a user is blocked, force them out
   useEffect(() => {
     if (userData?.isBlocked && phase !== "gateway") {
@@ -52,9 +87,6 @@ function RavenOracleApp() {
     }
   }, [userData, phase, toast]);
   
-  // Consolidate admin authority
-  const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
-
   const handleGatewaySuccess = (isAdminMode: boolean) => {
     setIsAdminEntry(isAdminMode);
     setPhase("verification");
@@ -122,6 +154,7 @@ function RavenOracleApp() {
           onLogout={handleSessionEnd} 
           isAdmin={isUserAdmin}
           onOpenAdmin={handleToggleAdmin}
+          pendingRequestCount={pendingRequests?.length || 0}
         />
       )}
 

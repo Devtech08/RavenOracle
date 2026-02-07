@@ -1,0 +1,17 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "raven-emblem",
+      "description": "A mysterious glowing raven emblem",
+      "imageUrl": "https://picsum.photos/seed/raven77/800/800",
+      "imageHint": "mystic raven"
+    },
+    {
+      "id": "secure-vault",
+      "description": "A high-tech digital vault with cyan highlights",
+      "imageUrl": "https://picsum.photos/seed/vault22/1200/800",
+      "imageHint": "cyber security"
+    }
+  ]
+}

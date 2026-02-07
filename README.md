@@ -1,7 +1,7 @@
 
 # Raven Oracle | Secure Communication Portal
 
-A high-security, futuristic communication platform designed for discrete operations. The portal features a terminal-inspired interface with tiered access controls and real-time encrypted data streams.
+A high-security, futuristic communication platform designed for discrete operations. The portal features a terminal-inspired interface with tiered access controls, real-time encrypted data streams, and session persistence.
 
 ## 🏗️ Tech Stack
 
@@ -20,6 +20,9 @@ To update the main gateway emblem:
 - The system automatically applies **Screen Blending** to filter out black backgrounds and isolates the emblem with a cyan glow.
 
 ## 🔑 Access Control & Identity
+
+### Session Persistence
+The portal is equipped with an identity buffer. Operational phases and active session metadata are persisted across browser refreshes, ensuring continuous connectivity for operatives.
 
 ### Gateway Sequences
 Entry is controlled by two primary sequences:

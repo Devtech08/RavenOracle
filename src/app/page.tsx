@@ -15,11 +15,39 @@ function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
   const [isAdminEntry, setIsAdminEntry] = useState(false);
   const [sessionData, setSessionData] = useState<{ callsign: string; key: string } | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
   const lastPendingCount = useRef(0);
+
+  // Persistence: Restore state on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("raven_oracle_session_v3");
+    if (saved) {
+      try {
+        const { phase: p, isAdminEntry: i, sessionData: s } = JSON.parse(saved);
+        if (p) setPhase(p);
+        if (i !== undefined) setIsAdminEntry(i);
+        if (s) setSessionData(s);
+      } catch (e) {
+        console.error("Failed to restore session state", e);
+      }
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Persistence: Save state on change
+  useEffect(() => {
+    if (isHydrated) {
+      localStorage.setItem("raven_oracle_session_v3", JSON.stringify({
+        phase,
+        isAdminEntry,
+        sessionData
+      }));
+    }
+  }, [phase, isAdminEntry, sessionData, isHydrated]);
 
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
@@ -75,6 +103,7 @@ function RavenOracleApp() {
       setPhase("gateway");
       setSessionData(null);
       setIsAdminEntry(false);
+      localStorage.removeItem("raven_oracle_session_v3");
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 
@@ -122,9 +151,10 @@ function RavenOracleApp() {
     setSessionData(null);
     setIsAdminEntry(false);
     setPhase("gateway");
+    localStorage.removeItem("raven_oracle_session_v3");
   };
 
-  if (isUserLoading) {
+  if (isUserLoading || !isHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background font-body text-primary animate-pulse tracking-[0.5em]">
         INITIALIZING_ORACLE...

@@ -28,7 +28,8 @@ import {
   Settings,
   User,
   History,
-  Target
+  Target,
+  ShieldCheck
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
@@ -70,7 +71,6 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
       return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
     } else {
       // Users see messages sent since session started, AND directed to them or "ALL"
-      // Note: In local state we also see what we sent.
       return query(
         collection(db, "messageLogs"),
         where("timestamp", ">=", sessionStartTime),
@@ -142,7 +142,12 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
       timestamp: new Date().toISOString()
     });
     
-    toast({ title: "REQUEST_SUBMITTED", description: "Admin approval required for callsign update." });
+    toast({ 
+      title: "REQUEST_TRANSMITTED", 
+      description: isAdmin 
+        ? "Command identity shift requires approval. Access the Admin Panel to authorize." 
+        : "Operative identity shift requires Admin approval." 
+    });
     setNewCallsign("");
     setIsRequesting(false);
   };
@@ -159,7 +164,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <span>Identity: {currentCallsign}</span>
-              {isAdmin && <span className="ml-2 text-primary font-bold">[ARCHIVE_ACCESS]</span>}
+              {isAdmin && <span className="ml-2 text-primary font-bold">[WARRIOR_PROTOCOL]</span>}
             </div>
           </div>
         </div>
@@ -167,30 +172,38 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
         <div className="flex items-center space-x-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-xs opacity-70 hover:opacity-100">
+              <Button variant="ghost" size="sm" className="text-xs opacity-70 hover:opacity-100 hover:text-primary">
                 <User className="w-3 h-3 mr-2" />
-                PROFILE
+                IDENTITY_SHIFT
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-card border-border">
               <DialogHeader>
-                <DialogTitle className="text-primary text-sm uppercase tracking-widest">Update Callsign</DialogTitle>
+                <DialogTitle className="text-primary text-sm uppercase tracking-widest">Update Portal Callsign</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase opacity-50">New Callsign</label>
+                  <label className="text-[10px] uppercase opacity-50 font-bold">Current Identity</label>
+                  <div className="p-3 bg-secondary/30 border border-border rounded font-mono text-xs opacity-50">
+                    {currentCallsign}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase opacity-50 font-bold">Proposed Identity</label>
                   <Input 
                     value={newCallsign}
-                    onChange={(e) => setNewCallsign(e.target.value)}
+                    onChange={(e) => setNewCallsign(e.target.value.toUpperCase())}
                     placeholder="ENTER_NEW_CALLSIGN"
-                    className="bg-secondary/50 font-mono uppercase"
+                    className="bg-secondary/50 font-mono uppercase border-primary/20 focus:ring-primary"
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground">Note: Identity changes require Oracle Administrator approval.</p>
+                <p className="text-[9px] text-muted-foreground uppercase tracking-wider">
+                  System Note: Identity shifts require explicit administrative authorization before synchronization.
+                </p>
               </div>
               <DialogFooter>
-                <Button onClick={handleRequestCallsign} disabled={isRequesting || !newCallsign} className="bg-primary text-primary-foreground text-xs w-full font-bold">
-                  SUBMIT_CHANGE_REQUEST
+                <Button onClick={handleRequestCallsign} disabled={isRequesting || !newCallsign} className="bg-primary text-primary-foreground text-xs w-full font-bold border-glow-cyan h-11">
+                  SUBMIT_SHIFT_REQUEST
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -234,7 +247,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             >
               <div className="flex items-center space-x-2 mb-1 px-1">
                 {!msg.isMe && <Ghost className="w-3 h-3 text-primary" />}
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center">
                   {msg.sender} 
                   {msg.recipient !== "ALL" && <span className="text-primary/60 ml-1">→ {msg.recipient}</span>}
                 </span>
@@ -273,7 +286,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 placeholder="ALL / CALLSIGN"
               />
             </div>
-            <p className="text-[9px] text-muted-foreground opacity-50 italic">Type 'WARRIOR' for direct Oracle Admin contact.</p>
+            <p className="text-[9px] text-muted-foreground opacity-50 italic">Target specific callsigns for encrypted direct comms.</p>
           </div>
           
           <div className="flex space-x-2">
@@ -297,3 +310,4 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     </div>
   );
 }
+

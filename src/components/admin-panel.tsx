@@ -29,11 +29,12 @@ import {
   Send,
   Ghost,
   History,
-  Target
+  Target,
+  UserRound
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, orderBy, serverTimestamp, getDoc } from "firebase/firestore";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -105,12 +106,27 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     setInviteLink(`${window.location.origin}/?invite=${newKey}`);
   };
 
-  const handleApproveCallsign = (request: any) => {
+  const handleApproveCallsign = async (request: any) => {
+    // Update main operative registry
     updateDocumentNonBlocking(doc(db, "users", request.userId), {
       callsign: request.requestedCallsign
     });
+
+    // Check if this user is an admin and update their command role callsign as well
+    const adminRoleRef = doc(db, "roles_admin", request.userId);
+    try {
+      const adminSnap = await getDoc(adminRoleRef);
+      if (adminSnap.exists()) {
+        updateDocumentNonBlocking(adminRoleRef, {
+          callsign: request.requestedCallsign
+        });
+      }
+    } catch (e) {
+      // Not an admin or permission error, ignore role update
+    }
+
     deleteDocumentNonBlocking(doc(db, "callsignRequests", request.id));
-    toast({ title: "CALLSIGN_APPROVED" });
+    toast({ title: "IDENTITY_SHIFT_AUTHORIZED", description: `Subject ${request.currentCallsign} is now ${request.requestedCallsign}` });
   };
 
   const handleApproveSession = (request: any) => {
@@ -136,8 +152,12 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     e.preventDefault();
     if (!broadcastInput.trim() || !user) return;
 
+    // Get current admin callsign
+    const adminUser = users?.find(u => u.id === user.uid);
+    const senderName = adminUser?.callsign || "WARRIOR";
+
     addDocumentNonBlocking(collection(db, "messageLogs"), {
-      sender: "WARRIOR",
+      sender: senderName,
       userId: user.uid,
       recipient: messageRecipient,
       content: broadcastInput.trim(),
@@ -165,7 +185,7 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.4.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.5.0</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
             <X className="w-5 h-5" />
@@ -232,7 +252,10 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                 <TableBody>
                   {users?.map((u) => (
                     <TableRow key={u.id} className="border-border">
-                      <TableCell className="font-bold text-xs">{u.callsign}</TableCell>
+                      <TableCell className="font-bold text-xs flex items-center">
+                        {u.callsign}
+                        {u.isAdmin && <ShieldCheck className="w-3 h-3 ml-2 text-primary opacity-70" />}
+                      </TableCell>
                       <TableCell>
                         {u.faceData ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary">VISAGE_HASHED</Badge> : <Badge variant="destructive" className="text-[8px]">UNVERIFIED</Badge>}
                       </TableCell>
@@ -312,12 +335,12 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                       {messages?.map((msg) => (
                         <div key={msg.id} className="flex flex-col space-y-1">
                           <div className="flex items-center space-x-2 text-[9px] uppercase font-bold tracking-tighter opacity-60">
-                            <span className={msg.sender === 'WARRIOR' ? 'text-primary' : ''}>{msg.sender}</span>
+                            <span className={msg.sender === 'WARRIOR' || msg.sender === 'SYSTEM' ? 'text-primary' : ''}>{msg.sender}</span>
                             <span className="opacity-40">→</span>
                             <span className="opacity-70">{msg.recipient}</span>
                             <span className="opacity-40 ml-auto">{msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleString() : ''}</span>
                           </div>
-                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
+                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' || msg.sender === 'SYSTEM' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
                             {msg.content}
                           </div>
                         </div>
@@ -350,7 +373,7 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                             </SelectTrigger>
                             <SelectContent className="bg-card border-border">
                               <SelectItem value="ALL" className="text-[10px]">ALL (BROADCAST)</SelectItem>
-                              {users?.filter(u => u.callsign !== 'WARRIOR').map(u => (
+                              {users?.filter(u => u.id !== user?.uid).map(u => (
                                 <SelectItem key={u.id} value={u.callsign} className="text-[10px]">{u.callsign}</SelectItem>
                               ))}
                             </SelectContent>
@@ -403,17 +426,19 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
                 </Card>
 
                 <Card className="bg-secondary/20 border-border">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center space-x-2">
+                    <UserRound className="w-4 h-4 text-primary" />
                     <CardTitle className="text-xs uppercase text-primary">Operative Provisioning</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <p className="text-[9px] opacity-50 uppercase mb-2">Generate encryption keys for new subject recruitment.</p>
                     <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>
                     {inviteLink && (
-                      <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2">
+                      <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2 animate-in zoom-in-95">
                         <Input readOnly value={inviteLink} className="text-[9px] font-mono h-6" />
                         <Button size="sm" onClick={() => {
                           navigator.clipboard.writeText(inviteLink);
-                          toast({ title: "COPIED" });
+                          toast({ title: "ENCRYPTION_LINK_COPIED" });
                         }} className="h-6 text-[9px]">COPY</Button>
                       </div>
                     )}
@@ -427,3 +452,4 @@ export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
     </div>
   );
 }
+

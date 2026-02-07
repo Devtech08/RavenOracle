@@ -68,14 +68,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     const userSnap = await getDocs(usersQuery);
     const isRegistered = !userSnap.empty;
 
-    // Check if callsign matches the current user or is a new registration
-    if (isFirstAdminRegistration) {
-      setStep("biometric_choice");
-      setIsLoading(false);
-      return;
-    }
-
-    if (isAdminMode && isWarriorCallsign && adminExists) {
+    if (isFirstAdminRegistration || (isAdminMode && isWarriorCallsign)) {
       setStep("biometric_choice");
       setIsLoading(false);
       return;
@@ -113,22 +106,29 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
     setIsLoading(true);
     try {
-      // Note: In a production app, these challenges would come from the server
+      // Check if platform authenticator is available
+      const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!available) {
+        throw new Error("PLATFORM_AUTHENTICATOR_UNAVAILABLE");
+      }
+
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
       
-      const options: any = {
+      const userId = user?.uid ? new TextEncoder().encode(user.uid) : new Uint8Array([0]);
+      
+      const options: CredentialCreationOptions = {
         publicKey: {
           challenge: challenge,
           rp: { name: "Raven Oracle" },
           user: {
-            id: Uint8Array.from(user?.uid || "user", c => c.charCodeAt(0)),
-            name: callsign,
-            displayName: callsign
+            id: userId,
+            name: callsign || "operative",
+            displayName: callsign || "Operative"
           },
           pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-          authenticatorSelection: { authenticatorAttachment: "platform" },
-          timeout: 60000
+          timeout: 60000,
+          attestation: "none"
         }
       };
 
@@ -148,9 +148,20 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       } else {
         setStep("final_verification");
       }
-    } catch (err) {
-      console.error(err);
-      toast({ variant: "destructive", title: "SENSOR_ERROR", description: "Biometric link failed. Please retry." });
+    } catch (err: any) {
+      console.error("Biometric Error:", err);
+      let errorTitle = "SENSOR_ERROR";
+      let errorDesc = "Biometric link failed. Ensure your device has an active fingerprint/face sensor.";
+      
+      if (err.name === "NotAllowedError") {
+        errorTitle = "ACCESS_CANCELLED";
+        errorDesc = "Biometric prompt was dismissed.";
+      } else if (err.message === "PLATFORM_AUTHENTICATOR_UNAVAILABLE") {
+        errorTitle = "HARDWARE_MISSING";
+        errorDesc = "No compatible platform authenticator (TouchID/Hello) found.";
+      }
+
+      toast({ variant: "destructive", title: errorTitle, description: errorDesc });
     } finally {
       setIsLoading(false);
     }
@@ -255,9 +266,10 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
             </Button>
             <Button 
               onClick={handleFingerprintAuth}
+              disabled={isLoading}
               className="h-20 flex flex-col space-y-2 bg-secondary/30 border border-primary/20 hover:bg-primary/10 group"
             >
-              <Fingerprint className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+              {isLoading ? <Loader2 className="w-5 h-5 text-primary animate-spin" /> : <Fingerprint className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />}
               <span className="text-[10px] font-bold tracking-widest">HARDWARE_SENSOR</span>
             </Button>
           </div>

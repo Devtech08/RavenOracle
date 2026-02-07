@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -26,7 +27,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
       setHasCameraPermission(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Trigger rapid autonomous capture sequence
+        // Trigger rapid autonomous capture sequence immediately
         setCountdown(1.5);
       }
     } catch (error) {
@@ -51,21 +52,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
     };
   }, [getCameraPermission]);
 
-  useEffect(() => {
-    if (countdown === null || isCaptured) return;
-
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        // Decrement by 0.5 for smoother rapid feel
-        setCountdown(prev => (prev !== null ? prev - 0.5 : null));
-      }, 500);
-      return () => clearTimeout(timer);
-    } else if (countdown <= 0) {
-      handleCapture();
-    }
-  }, [countdown, isCaptured]);
-
-  const handleCapture = () => {
+  const handleCapture = useCallback(() => {
     if (videoRef.current && canvasRef.current && !isCaptured) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
@@ -77,7 +64,20 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         onCapture(imageData);
       }
     }
-  };
+  }, [isCaptured, onCapture]);
+
+  useEffect(() => {
+    if (countdown === null || isCaptured) return;
+
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(prev => (prev !== null ? prev - 0.5 : null));
+      }, 500);
+      return () => clearTimeout(timer);
+    } else if (countdown <= 0) {
+      handleCapture();
+    }
+  }, [countdown, isCaptured, handleCapture]);
 
   const handleReset = () => {
     setIsCaptured(false);
@@ -108,7 +108,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         )}
         
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-           <span className="text-[10px] bg-black/60 px-3 py-1 text-primary font-mono tracking-widest uppercase border border-primary/20">
+           <span className="text-[10px] bg-black/60 px-3 py-1 text-primary font-mono tracking-widest uppercase border border-primary/20 whitespace-nowrap">
              {isCaptured ? "VISAGE_LOCKED" : countdown !== null ? "ESTABLISHING_LINK..." : label}
            </span>
         </div>

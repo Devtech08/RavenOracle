@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -151,10 +152,10 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     toast({ title: "MESSAGE_TRANSMITTED" });
   };
 
-  // Deduplicate users for the recipient list to avoid duplicate keys in Select
+  // Deduplicate users by callsign to avoid duplicate keys in Select
   const uniqueRecipientUsers = Array.from(new Set(users?.map(u => u.callsign))).map(callsign => {
     return users?.find(u => u.callsign === callsign);
-  }).filter(Boolean);
+  }).filter((u): u is any => !!u);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-fade-in">
@@ -235,7 +236,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                         {u.isAdmin && <ShieldCheck className="w-3 h-3 ml-2 text-primary opacity-70" />}
                       </TableCell>
                       <TableCell>
-                        {u.faceData ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary uppercase">Linked</Badge> : <Badge variant="destructive" className="text-[8px] uppercase">Unverified</Badge>}
+                        {u.faceData || u.biometricType ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary uppercase">Linked</Badge> : <Badge variant="destructive" className="text-[8px] uppercase">Unverified</Badge>}
                       </TableCell>
                       <TableCell>
                         <Badge variant={u.isBlocked ? "destructive" : "outline"} className="text-[8px] uppercase">
@@ -300,7 +301,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                           <SelectContent className="bg-card border-border">
                             <SelectItem value="ALL" className="text-[10px]">ALL (BROADCAST)</SelectItem>
                             {uniqueRecipientUsers.filter(u => u.id !== user?.uid).map(u => (
-                              <SelectItem key={u.id} value={u.callsign} className="text-[10px]">{u.callsign}</SelectItem>
+                              <SelectItem key={u.id || u.callsign} value={u.callsign} className="text-[10px]">{u.callsign}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

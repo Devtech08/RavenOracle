@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -34,9 +33,9 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     const submitted = input.toLowerCase().trim();
 
     if (submitted === adminSequence.toLowerCase()) {
-      onUnlock(true); // Admin Bypass Mode
+      onUnlock(true);
     } else if (submitted === targetSequence.toLowerCase()) {
-      onUnlock(false); // Operative Mode
+      onUnlock(false);
     } else {
       setError(true);
       setInput("");
@@ -48,13 +47,13 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-8 flex flex-col items-center justify-center group">
         
-        {/* Identity Emblem Container */}
-        <div className="mb-8 relative w-48 h-48 flex flex-col items-center justify-center bg-transparent isolate">
+        {/* Isolated Identity Emblem */}
+        <div className="mb-6 relative w-56 h-56 flex flex-col items-center justify-center bg-transparent isolate overflow-hidden">
           {logoExists ? (
             <img 
               src="/logo.jpeg" 
               alt="IDENTITY_EMBLEM" 
-              className="w-full h-full object-contain mix-blend-screen opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_25px_rgba(0,255,255,0.6)] brightness-110 contrast-125"
+              className="w-full h-full object-contain mix-blend-screen opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-105 drop-shadow-[0_0_30px_rgba(0,255,255,0.7)] brightness-125 contrast-150"
               onError={() => setLogoExists(false)}
             />
           ) : (
@@ -74,6 +73,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
           )}
         </div>
 
+        {/* Terminal Symbol */}
         <div className="relative w-24 h-24 flex items-center justify-center">
           <div className="relative flex items-baseline space-x-1">
             <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">

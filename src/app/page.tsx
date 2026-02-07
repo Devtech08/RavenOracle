@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,9 +21,8 @@ function RavenOracleApp() {
   const { toast } = useToast();
   const lastPendingCount = useRef(0);
 
-  // Initialize Anonymous Session immediately
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
     }
   }, [user, isUserLoading, auth]);
@@ -41,19 +39,16 @@ function RavenOracleApp() {
   }, [db, user]);
   const { data: adminData } = useDoc(adminDocRef);
 
-  // Identity logic: True if they are in the registry, typed the admin sequence, or are the Warrior
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
-  // Critical Fix: Only initiate the queue query if the user is authenticated and is an admin
   const pendingRequestsQuery = useMemoFirebase(() => {
     if (!db || !user || !isUserAdmin) return null;
     return query(collection(db, "sessionRequests"), where("status", "==", "pending"));
   }, [db, user, isUserAdmin]);
   const { data: pendingRequests } = useCollection(pendingRequestsQuery);
 
-  // Global Admin Notification Listener
   useEffect(() => {
-    if (isUserAdmin && pendingRequests) {
+    if (isUserAdmin && pendingRequests && user) {
       const currentCount = pendingRequests.length;
       if (currentCount > 0 && currentCount > lastPendingCount.current) {
         toast({
@@ -73,9 +68,8 @@ function RavenOracleApp() {
       }
       lastPendingCount.current = currentCount;
     }
-  }, [pendingRequests, isUserAdmin, toast]);
+  }, [pendingRequests, isUserAdmin, toast, user]);
 
-  // Enforce Termination: If a user is blocked, force them out
   useEffect(() => {
     if (userData?.isBlocked && phase !== "gateway") {
       setPhase("gateway");
@@ -95,7 +89,7 @@ function RavenOracleApp() {
   };
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
-    if (user) {
+    if (user && db) {
       const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || key === "WARRIOR_ENTRY" || isUserAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
@@ -110,12 +104,7 @@ function RavenOracleApp() {
       if (isSystemAdmin) {
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
         setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
-        
-        if (isAdminEntry) {
-          setPhase("admin");
-        } else {
-          setPhase("chat");
-        }
+        setPhase(isAdminEntry ? "admin" : "chat");
       } else {
         setSessionData({ callsign: finalCallsign, key });
         setPhase("chat");
@@ -168,7 +157,6 @@ function RavenOracleApp() {
         />
       )}
       
-      {/* Background Ambience */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] opacity-30">
         <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-primary/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-secondary/10 rounded-full blur-[120px]" />

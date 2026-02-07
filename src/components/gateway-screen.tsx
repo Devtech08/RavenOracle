@@ -45,21 +45,21 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
-      <div className="mb-12 flex flex-col items-center justify-center group">
-        {/* Custom Logo Integration - Expects logo.jpeg in public/ */}
-        <div className="mb-6 relative w-24 h-24 flex items-center justify-center">
+      <div className="mb-8 flex flex-col items-center justify-center group">
+        {/* Custom Logo Integration - Linked to /public/logo.jpeg */}
+        <div className="mb-4 relative w-28 h-28 flex items-center justify-center overflow-hidden">
           <img 
             src="/logo.jpeg" 
-            alt="PROVISION_LOGO" 
-            className="w-full h-full object-contain opacity-60 group-hover:opacity-100 transition-all duration-500 scale-95 group-hover:scale-100 glow-cyan filter brightness-125"
+            alt="ORACLE_LOGO" 
+            className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_15px_rgba(0,255,255,0.4)]"
             onError={(e) => {
-              // Hide the container if the logo is missing
+              // Hide if logo not found
               (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
             }}
           />
         </div>
 
-        <div className="relative w-32 h-32 flex items-center justify-center">
+        <div className="relative w-24 h-24 flex items-center justify-center">
           <div className="relative flex items-baseline space-x-1">
             <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
               &gt;

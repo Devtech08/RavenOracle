@@ -12,6 +12,10 @@ A high-security, futuristic communication platform designed for discrete operati
 - **Icons**: Lucide React
 - **Typography**: Source Code Pro (Monospace focus)
 
+## 🎨 Branding
+The portal uses a custom identity link. To update the main gateway emblem:
+- Upload your logo to `public/logo.jpeg`.
+
 ## 🔑 Access Control & Identity
 
 ### Gateway Sequences

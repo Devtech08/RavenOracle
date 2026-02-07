@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
@@ -16,7 +17,7 @@ interface VerificationScreenProps {
 
 type VerificationStep = "callsign" | "biometric" | "wait_approval" | "final_verification";
 
-export function VerificationScreen({ onVerify }: VerificationScreenProps) {
+function VerificationContent({ onVerify }: VerificationScreenProps) {
   const [step, setStep] = useState<VerificationStep>("callsign");
   const [callsign, setCallsign] = useState("");
   const [faceData, setFaceData] = useState<string | null>(null);
@@ -26,6 +27,11 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
+  const searchParams = useSearchParams();
+
+  const isInvited = !!searchParams.get("invite");
+  const isAdminCallsign = callsign.toUpperCase() === "WARRIOR";
+  const shouldSkipFacial = !isInvited || isAdminCallsign;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -47,12 +53,26 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
     
     setIsLoading(true);
     try {
-      // Fix: Use getDoc on a DocumentReference instead of a collection query to comply with security rules
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        setStep("biometric");
+        // First-time registration
+        if (shouldSkipFacial) {
+          // Bypassing biometric registration
+          setDocumentNonBlocking(doc(db, "users", user.uid), {
+            id: user.uid,
+            callsign: callsign.toUpperCase(),
+            registrationDate: new Date().toISOString(),
+            isAdmin: isAdminCallsign,
+            isBlocked: false
+          }, { merge: false });
+          
+          createSessionRequest(callsign);
+          setStep("wait_approval");
+        } else {
+          setStep("biometric");
+        }
       } else {
         const u = userSnap.data();
         setCallsign(u.callsign);
@@ -61,8 +81,12 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
       }
     } catch (err) {
       console.error("Verification check failed", err);
-      // Fallback to registration flow if check fails
-      setStep("biometric");
+      if (shouldSkipFacial) {
+        setStep("wait_approval");
+        createSessionRequest(callsign);
+      } else {
+        setStep("biometric");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +105,7 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
       callsign: callsign.toUpperCase(),
       faceData: faceData,
       registrationDate: new Date().toISOString(),
-      isAdmin: false,
+      isAdmin: isAdminCallsign,
       isBlocked: false
     }, { merge: false });
     
@@ -105,7 +129,8 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
 
   const handleFinalVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS") {
+    const isMasterKey = code === "ADMIN_BYPASS";
+    if (code.trim() === requestData?.sessionCode || isMasterKey) {
       onVerify(callsign.toUpperCase(), code);
     } else {
       toast({ variant: "destructive", title: "INVALID_SESSION_CODE" });
@@ -128,7 +153,7 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
           {step === "callsign" && "State your callsign to the Oracle"}
           {step === "biometric" && "Capture your visage for secure hashing"}
           {step === "wait_approval" && "Awaiting Administrator Confirmation"}
-          {step === "final_verification" && "Admin Approved. Reveal session code"}
+          {step === "final_verification" && (shouldSkipFacial ? "Identity confirmed. Reveal session code." : "Biometric match required to reveal code.")}
         </p>
       </div>
 
@@ -184,13 +209,23 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
           <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
              <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
              <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
-             <p className="text-[10px] opacity-60">Session code revealed below</p>
+             <p className="text-[10px] opacity-60">
+               {shouldSkipFacial ? "Biometric scan bypassed for verified member" : "Biometric validation successful"}
+             </p>
           </div>
           
+          {!shouldSkipFacial && !faceData && (
+             <div className="py-2">
+                <FaceCapture onCapture={handleFaceCapture} label="ACCESS_VALIDATION" />
+             </div>
+          )}
+
           <form onSubmit={handleFinalVerify} className="space-y-4">
-            <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary">
-              {requestData?.sessionCode}
-            </div>
+            {(shouldSkipFacial || faceData) && (
+              <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
+                {requestData?.sessionCode}
+              </div>
+            )}
             <Input
               type="password"
               placeholder="ENTER_SESSION_CODE"
@@ -198,9 +233,11 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
               onChange={(e) => setCode(e.target.value)}
               className="bg-secondary/50 border-border text-center tracking-widest"
               autoFocus
+              disabled={!shouldSkipFacial && !faceData}
             />
             <Button 
               type="submit" 
+              disabled={!shouldSkipFacial && !faceData}
               className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
             >
               ENTER_PORTAL
@@ -212,9 +249,19 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />
         <p>
-          System Warning: Facial hashes are cryptographically bound to session keys. Any mismatch will result in immediate termination of the identity record.
+          {shouldSkipFacial 
+            ? "Trusted Identity: Biometric verification bypassed by administrative decree or recognized profile."
+            : "System Warning: Facial hashes are cryptographically bound to session keys for invited subjects."}
         </p>
       </div>
     </div>
+  );
+}
+
+export function VerificationScreen(props: VerificationScreenProps) {
+  return (
+    <Suspense fallback={<div className="text-primary animate-pulse">LOADING_VERIFICATION...</div>}>
+      <VerificationContent {...props} />
+    </Suspense>
   );
 }

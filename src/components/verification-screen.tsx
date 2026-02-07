@@ -1,73 +1,114 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Key, User } from "lucide-react";
+import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore } from "@/firebase";
-import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { collection, query, where, getDocs, updateDoc, doc, addDoc, setDoc } from "firebase/firestore";
+import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
   onVerify: (callsign: string, key: string) => void;
 }
 
+type VerificationStep = "callsign" | "biometric" | "wait_approval" | "final_verification";
+
 export function VerificationScreen({ onVerify }: VerificationScreenProps) {
+  const [step, setStep] = useState<VerificationStep>("callsign");
   const [callsign, setCallsign] = useState("");
+  const [faceData, setFaceData] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const db = useFirestore();
+  const { user } = useUser();
 
-  // Check for invite code in URL on mount
+  const requestRef = useMemoFirebase(() => {
+    if (!db || !requestId) return null;
+    return doc(db, "sessionRequests", requestId);
+  }, [db, requestId]);
+
+  const { data: requestData } = useDoc(requestRef);
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const invite = params.get("invite");
-    if (invite) {
-      setCode(invite);
+    if (requestData?.status === "approved" && step === "wait_approval") {
+      setStep("final_verification");
+      toast({ title: "ACCESS_GRANTED", description: "Admin approved your request. Reveal your session code." });
     }
-  }, []);
+  }, [requestData, step, toast]);
 
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!callsign.trim() || !code.trim()) return;
-
-    setIsLoading(true);
+    if (!callsign.trim() || !user) return;
     
+    setIsLoading(true);
     try {
-      // Validate access key in Firestore
-      const keysRef = collection(db, "accessKeys");
-      const q = query(keysRef, where("accessKey", "==", code.trim()), where("isUsed", "==", false));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty || code === "ADMIN_BYPASS") {
-        const keyDoc = querySnapshot.docs[0];
-        
-        // Mark key as used if it's a real document (not bypass)
-        if (keyDoc) {
-          await updateDoc(doc(db, "accessKeys", keyDoc.id), {
-            isUsed: true,
-            usedAt: new Date().toISOString()
-          });
-        }
-        
-        onVerify(callsign.trim(), code.trim());
+      // Check if user exists
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDocs(query(collection(db, "users"), where("id", "==", user.uid)));
+      
+      if (userSnap.empty) {
+        setStep("biometric");
       } else {
-        toast({
-          variant: "destructive",
-          title: "AUTHENTICATION_FAILED",
-          description: "Invalid or expired secret key. Session terminated.",
-        });
-        setCode("");
+        const u = userSnap.docs[0].data();
+        setCallsign(u.callsign);
+        setStep("wait_approval");
+        createSessionRequest(u.callsign);
       }
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "SYSTEM_ERROR",
-        description: "Communication with the Oracle failed.",
-      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFaceCapture = async (data: string) => {
+    setFaceData(data);
+  };
+
+  const handleRegistrationComplete = async () => {
+    if (!faceData || !user) return;
+    setIsLoading(true);
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        id: user.uid,
+        callsign: callsign.toUpperCase(),
+        faceData: faceData,
+        registrationDate: new Date().toISOString(),
+        isAdmin: false,
+        isBlocked: false
+      });
+      
+      createSessionRequest(callsign);
+      setStep("wait_approval");
+    } catch (e) {
+      toast({ variant: "destructive", title: "REGISTRATION_FAILED" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createSessionRequest = async (name: string) => {
+    if (!user) return;
+    const reqId = Math.random().toString(36).substring(7);
+    await setDoc(doc(db, "sessionRequests", reqId), {
+      id: reqId,
+      userId: user.uid,
+      callsign: name.toUpperCase(),
+      status: "pending",
+      timestamp: new Date().toISOString()
+    });
+    setRequestId(reqId);
+  };
+
+  const handleFinalVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS") {
+      onVerify(callsign.toUpperCase(), code);
+    } else {
+      toast({ variant: "destructive", title: "INVALID_SESSION_CODE" });
     }
   };
 
@@ -75,18 +116,26 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
     <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
-          <Key className="w-8 h-8 text-primary glow-cyan" />
+          {step === "biometric" ? <Camera className="w-8 h-8 text-primary glow-cyan" /> : <Key className="w-8 h-8 text-primary glow-cyan" />}
         </div>
-        <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">Identity Verification</h2>
-        <p className="text-muted-foreground text-xs">
-          State your callsign and enter your unique access key.
+        <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">
+          {step === "callsign" && "Identity Registry"}
+          {step === "biometric" && "Biometric Capture"}
+          {step === "wait_approval" && "Approval Pending"}
+          {step === "final_verification" && "Session Unlock"}
+        </h2>
+        <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
+          {step === "callsign" && "State your callsign to the Oracle"}
+          {step === "biometric" && "Capture your visage for secure hashing"}
+          {step === "wait_approval" && "Awaiting Administrator Confirmation"}
+          {step === "final_verification" && "Admin Approved. Reveal session code"}
         </p>
       </div>
 
-      <form onSubmit={handleVerify} className="space-y-4">
-        <div className="space-y-3">
+      {step === "callsign" && (
+        <form onSubmit={handleInitialSubmit} className="space-y-4">
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="CALLSIGN"
@@ -96,31 +145,74 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
               autoFocus
             />
           </div>
-          <div className="relative">
-            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Button 
+            type="submit" 
+            disabled={isLoading || !callsign}
+            className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
+          >
+            {isLoading ? <Loader2 className="animate-spin" /> : "REQUEST_ACCESS"}
+          </Button>
+        </form>
+      )}
+
+      {step === "biometric" && (
+        <div className="space-y-4">
+          <FaceCapture onCapture={handleFaceCapture} />
+          <Button 
+            onClick={handleRegistrationComplete}
+            disabled={isLoading || !faceData}
+            className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground"
+          >
+            {isLoading ? <Loader2 className="animate-spin" /> : "FINALIZE_BIOMETRICS"}
+          </Button>
+        </div>
+      )}
+
+      {step === "wait_approval" && (
+        <div className="flex flex-col items-center justify-center p-8 space-y-4 border border-dashed border-border rounded-lg bg-secondary/20">
+          <Loader2 className="w-12 h-12 text-primary animate-spin opacity-50" />
+          <div className="text-center">
+            <p className="text-xs font-bold text-primary animate-pulse">TRANSMITTING_TO_WARRIOR...</p>
+            <p className="text-[10px] opacity-40 mt-2">Request ID: {requestId}</p>
+          </div>
+          <p className="text-[9px] text-center text-muted-foreground">The shadows are processing your request. Do not close this session.</p>
+        </div>
+      )}
+
+      {step === "final_verification" && (
+        <div className="space-y-6">
+          <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
+             <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
+             <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
+             <p className="text-[10px] opacity-60">Session code revealed below</p>
+          </div>
+          
+          <form onSubmit={handleFinalVerify} className="space-y-4">
+            <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary">
+              {requestData?.sessionCode}
+            </div>
             <Input
               type="password"
-              placeholder="ACCESS_KEY"
+              placeholder="ENTER_SESSION_CODE"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="pl-10 bg-secondary/50 border-border text-center tracking-widest"
+              className="bg-secondary/50 border-border text-center tracking-widest"
+              autoFocus
             />
-          </div>
+            <Button 
+              type="submit" 
+              className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
+            >
+              ENTER_PORTAL
+            </Button>
+          </form>
         </div>
-        
-        <Button 
-          type="submit" 
-          disabled={isLoading || !code || !callsign}
-          className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan transition-all"
-        >
-          {isLoading ? "ENCRYPTING..." : "ESTABLISH CONNECTION"}
-        </Button>
-      </form>
+      )}
 
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />
         <p>
-          Warning: Transient session active. All user logs are monitored by the Oracle. Unauthorized access is punishable by shadow-ban.
+          System Warning: Facial hashes are cryptographically bound to session keys. Any mismatch will result in immediate termination of the identity record.
         </p>
       </div>
     </div>

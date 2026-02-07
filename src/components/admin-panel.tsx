@@ -12,13 +12,12 @@ import {
   ShieldCheck, 
   UserPlus, 
   Trash2, 
-  Lock, 
-  RefreshCw, 
   X, 
-  Link as LinkIcon,
   Ban,
   Check,
-  ClipboardList
+  UserCheck,
+  Zap,
+  Fingerprint
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
@@ -35,10 +34,13 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const db = useFirestore();
 
   const usersQuery = useMemoFirebase(() => collection(db, "users"), [db]);
-  const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
+  const { data: users } = useCollection(usersQuery);
 
-  const requestsQuery = useMemoFirebase(() => collection(db, "callsignRequests"), [db]);
-  const { data: requests, isLoading: requestsLoading } = useCollection(requestsQuery);
+  const callsignRequestsQuery = useMemoFirebase(() => collection(db, "callsignRequests"), [db]);
+  const { data: callsignRequests } = useCollection(callsignRequestsQuery);
+
+  const sessionRequestsQuery = useMemoFirebase(() => collection(db, "sessionRequests"), [db]);
+  const { data: sessionRequests } = useCollection(sessionRequestsQuery);
 
   const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
@@ -80,6 +82,19 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     }
   };
 
+  const handleApproveSession = async (request: any) => {
+    try {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      await updateDoc(doc(db, "sessionRequests", request.id), {
+        status: "approved",
+        sessionCode: code
+      });
+      toast({ title: "SESSION_AUTHORIZED" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "AUTH_FAILED" });
+    }
+  };
+
   const handleAction = async (userId: string, action: 'block' | 'delete') => {
     try {
       if (action === 'delete') {
@@ -100,7 +115,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase">Admin Terminal v1.1.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase">Admin Terminal v1.2.0</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
             <X className="w-5 h-5" />
@@ -108,20 +123,57 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         </CardHeader>
         
         <CardContent className="flex-1 overflow-hidden p-6">
-          <Tabs defaultValue="members" className="h-full flex flex-col">
+          <Tabs defaultValue="sessions" className="h-full flex flex-col">
             <TabsList className="bg-secondary/50 border border-border w-fit mb-6">
-              <TabsTrigger value="members" className="text-[10px]">MEMBERS_REGISTRY</TabsTrigger>
-              <TabsTrigger value="requests" className="text-[10px]">PENDING_REQUESTS</TabsTrigger>
-              <TabsTrigger value="system" className="text-[10px]">GATEWAY_CONFIG</TabsTrigger>
-              <TabsTrigger value="invites" className="text-[10px]">PROVISIONING</TabsTrigger>
+              <TabsTrigger value="sessions" className="text-[10px]">ACCESS_SESSIONS</TabsTrigger>
+              <TabsTrigger value="members" className="text-[10px]">REGISTRY</TabsTrigger>
+              <TabsTrigger value="requests" className="text-[10px]">ID_UPDATES</TabsTrigger>
+              <TabsTrigger value="system" className="text-[10px]">SYSTEM</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="sessions" className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border">
+                    <TableHead className="text-primary uppercase text-[10px]">Subject</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px]">Request_ID</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px] text-right">Command</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessionRequests?.filter(r => r.status === 'pending').map((req) => (
+                    <TableRow key={req.id} className="border-border">
+                      <TableCell className="font-bold text-xs">{req.callsign}</TableCell>
+                      <TableCell>
+                         <Badge className="bg-yellow-500/20 text-yellow-500 text-[8px] border-yellow-500/30">AWAITING_ORACLE</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-[10px] opacity-40">{req.id}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleApproveSession(req)}>
+                          <Zap className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, "sessionRequests", req.id))}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {sessionRequests?.filter(r => r.status === 'pending').length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">NO_ACTIVE_SESSION_REQUESTS</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TabsContent>
 
             <TabsContent value="members" className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-primary uppercase text-[10px]">Callsign</TableHead>
-                    <TableHead className="text-primary uppercase text-[10px]">ID</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px]">Biometrics</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
                     <TableHead className="text-primary uppercase text-[10px] text-right">Actions</TableHead>
                   </TableRow>
@@ -130,7 +182,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                   {users?.map((u) => (
                     <TableRow key={u.id} className="border-border">
                       <TableCell className="font-bold text-xs">{u.callsign}</TableCell>
-                      <TableCell className="font-mono text-[10px] opacity-50">{u.id}</TableCell>
+                      <TableCell>
+                        {u.faceData ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary">SCAN_LOCKED</Badge> : <Badge variant="destructive" className="text-[8px]">MISSING</Badge>}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={u.isBlocked ? "destructive" : "outline"} className="text-[8px]">
                           {u.isBlocked ? "TERMINATED" : "ACTIVE"}
@@ -160,16 +214,14 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                   <TableRow className="border-border">
                     <TableHead className="text-primary text-[10px]">Current</TableHead>
                     <TableHead className="text-primary text-[10px]">Requested</TableHead>
-                    <TableHead className="text-primary text-[10px]">Timestamp</TableHead>
                     <TableHead className="text-primary text-[10px] text-right">Decision</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {requests?.map((req) => (
+                  {callsignRequests?.map((req) => (
                     <TableRow key={req.id} className="border-border">
                       <TableCell className="text-xs opacity-50">{req.currentCallsign}</TableCell>
                       <TableCell className="text-xs font-bold text-primary">{req.requestedCallsign}</TableCell>
-                      <TableCell className="text-[10px] opacity-40">{new Date(req.timestamp).toLocaleString()}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500" onClick={() => handleApproveCallsign(req)}>
                           <Check className="w-4 h-4" />
@@ -180,9 +232,9 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {requests?.length === 0 && (
+                  {callsignRequests?.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">NO_PENDING_IDENTITY_REQUESTS</TableCell>
+                      <TableCell colSpan={3} className="text-center py-12 opacity-30 text-[10px]">NO_PENDING_IDENTITY_REQUESTS</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -190,35 +242,39 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             </TabsContent>
 
             <TabsContent value="system" className="space-y-6">
-              <Card className="bg-secondary/20 border-border max-w-md">
-                <CardHeader>
-                  <CardTitle className="text-xs uppercase text-primary">Gateway Sequence</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 bg-background/50 border border-border rounded font-mono text-primary text-sm">
-                    {gatewayData?.gatewayAddress || "raven.oracle"}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder="NEW_SEQUENCE" className="font-mono text-xs" />
-                    <Button onClick={handleUpdateGateway} size="sm" className="bg-primary text-primary-foreground text-[10px]">UPDATE</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-secondary/20 border-border">
+                  <CardHeader>
+                    <CardTitle className="text-xs uppercase text-primary">Gateway Sequence</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-3 bg-background/50 border border-border rounded font-mono text-primary text-sm">
+                      {gatewayData?.gatewayAddress || "raven.oracle"}
+                    </div>
+                    <div className="flex space-x-2">
+                      <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder="NEW_SEQUENCE" className="font-mono text-xs h-8" />
+                      <Button onClick={handleUpdateGateway} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <TabsContent value="invites" className="space-y-6">
-              <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-lg bg-secondary/10">
-                <UserPlus className="w-12 h-12 text-primary mb-4 opacity-30" />
-                <Button onClick={handleGenerateInvite} className="bg-primary text-primary-foreground font-bold">PROVISION_NEW_KEY</Button>
-                {inviteLink && (
-                  <div className="mt-6 w-full max-w-sm p-3 bg-background border border-primary/30 rounded flex space-x-2">
-                    <Input readOnly value={inviteLink} className="text-[10px] font-mono h-8" />
-                    <Button size="sm" onClick={() => {
-                      navigator.clipboard.writeText(inviteLink);
-                      toast({ title: "COPIED" });
-                    }} className="h-8 text-[10px]">COPY</Button>
-                  </div>
-                )}
+                <Card className="bg-secondary/20 border-border">
+                  <CardHeader>
+                    <CardTitle className="text-xs uppercase text-primary">Identity Provisioning</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>
+                    {inviteLink && (
+                      <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2">
+                        <Input readOnly value={inviteLink} className="text-[9px] font-mono h-6" />
+                        <Button size="sm" onClick={() => {
+                          navigator.clipboard.writeText(inviteLink);
+                          toast({ title: "COPIED" });
+                        }} className="h-6 text-[9px]">COPY</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>

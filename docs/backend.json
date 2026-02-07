@@ -8,25 +8,24 @@
       "description": "Represents a user of the Raven Oracle portal.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the user entity."
+          "type": "string"
         },
         "callsign": {
+          "type": "string"
+        },
+        "faceData": {
           "type": "string",
-          "description": "The user's callsign for identification within the portal."
+          "description": "Base64 encoded facial capture data."
         },
         "registrationDate": {
           "type": "string",
-          "description": "The date and time when the user registered.",
           "format": "date-time"
         },
         "isAdmin": {
-          "type": "boolean",
-          "description": "Indicates whether the user has administrator privileges."
+          "type": "boolean"
         },
         "isBlocked": {
-          "type": "boolean",
-          "description": "Indicates whether the user is blocked from accessing the portal."
+          "type": "boolean"
         }
       },
       "required": [
@@ -37,32 +36,33 @@
         "isBlocked"
       ]
     },
+    "SessionRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SessionRequest",
+      "type": "object",
+      "description": "A request for a unique session key to access the portal.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "callsign": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "sessionCode": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "callsign", "status", "timestamp"]
+    },
     "CallsignRequest": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "CallsignRequest",
       "type": "object",
       "description": "Represents a request to change a user's callsign.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "currentCallsign": {
-          "type": "string"
-        },
-        "requestedCallsign": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string",
-          "enum": ["pending", "approved", "rejected"]
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "currentCallsign": { "type": "string" },
+        "requestedCallsign": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "currentCallsign", "requestedCallsign", "status", "timestamp"]
     },
@@ -91,19 +91,25 @@
       "schema": {
         "$ref": "#/backend/entities/User"
       },
-      "description": "User profiles."
+      "description": "User profiles including biometric data."
+    },
+    "/sessionRequests/{requestId}": {
+      "schema": {
+        "$ref": "#/backend/entities/SessionRequest"
+      },
+      "description": "Pending access requests requiring admin approval."
     },
     "/callsignRequests/{requestId}": {
       "schema": {
         "$ref": "#/backend/entities/CallsignRequest"
       },
-      "description": "Pending callsign change requests for admin approval."
+      "description": "Pending callsign change requests."
     },
     "/messageLogs/{messageId}": {
       "schema": {
         "$ref": "#/backend/entities/MessageLog"
       },
-      "description": "Archived communication logs accessible only to administrators."
+      "description": "Archived communication logs."
     }
   }
 }

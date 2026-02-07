@@ -41,6 +41,7 @@ service cloud.firestore {
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
+      allow list: if isAdmin();
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 

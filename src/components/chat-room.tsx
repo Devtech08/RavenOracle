@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -29,7 +28,7 @@ import {
   Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp } from "firebase/firestore";
 
 interface ChatRoomProps {
@@ -151,20 +150,44 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   };
 
   const handleRequestCallsign = () => {
-    if (!newCallsign.trim() || !user) return;
+    if (!newCallsign.trim() || !user || !db) return;
     setIsRequesting(true);
     
-    const requestId = Math.random().toString(36).substring(7);
-    addDocumentNonBlocking(collection(db, "callsignRequests"), {
-      id: requestId,
-      userId: user.uid,
-      currentCallsign: currentCallsign,
-      requestedCallsign: newCallsign.trim().toUpperCase(),
-      status: "pending",
-      timestamp: new Date().toISOString()
-    });
+    const cleanNewCallsign = newCallsign.trim().toUpperCase();
+
+    if (isAdmin) {
+      // WARRIOR level authorization: Bypass review process
+      updateDocumentNonBlocking(doc(db, "users", user.uid), {
+        callsign: cleanNewCallsign
+      });
+      
+      // Update admin role registry if it exists for this user
+      updateDocumentNonBlocking(doc(db, "roles_admin", user.uid), {
+        callsign: cleanNewCallsign
+      });
+
+      toast({ 
+        title: "IDENTITY_SHIFT_AUTHORIZED", 
+        description: `Active callsign successfully shifted to ${cleanNewCallsign}.` 
+      });
+    } else {
+      // Operative level: Requires explicit WARRIOR review
+      const requestId = Math.random().toString(36).substring(7);
+      addDocumentNonBlocking(collection(db, "callsignRequests"), {
+        id: requestId,
+        userId: user.uid,
+        currentCallsign: currentCallsign,
+        requestedCallsign: cleanNewCallsign,
+        status: "pending",
+        timestamp: new Date().toISOString()
+      });
+      
+      toast({ 
+        title: "REQUEST_TRANSMITTED", 
+        description: "Identity shift requested. Awaiting WARRIOR authorization." 
+      });
+    }
     
-    toast({ title: "REQUEST_TRANSMITTED", description: "Identity shift requires Admin authorization." });
     setNewCallsign("");
     setIsRequesting(false);
   };
@@ -195,7 +218,9 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             </DialogTrigger>
             <DialogContent className="bg-card border-border">
               <DialogHeader>
-                <DialogTitle className="text-primary text-sm uppercase tracking-widest">Identity Shift</DialogTitle>
+                <DialogTitle className="text-primary text-sm uppercase tracking-widest">
+                  {isAdmin ? "DIRECT_IDENTITY_SHIFT" : "IDENTITY_REQUEST"}
+                </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <Input 
@@ -207,7 +232,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               </div>
               <DialogFooter>
                 <Button onClick={handleRequestCallsign} disabled={isRequesting || !newCallsign} className="bg-primary text-primary-foreground text-xs w-full font-bold h-12">
-                  SUBMIT_REQUEST
+                  {isAdmin ? "APPLY_IMMEDIATELY" : "SUBMIT_FOR_CLEARANCE"}
                 </Button>
               </DialogFooter>
             </DialogContent>

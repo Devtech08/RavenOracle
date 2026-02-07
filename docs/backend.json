@@ -80,6 +80,20 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["sender", "userId", "recipient", "content", "timestamp"]
+    },
+    "AccessKey": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AccessKey",
+      "type": "object",
+      "description": "A unique key used to invite new operatives.",
+      "properties": {
+        "id": { "type": "string" },
+        "accessKey": { "type": "string" },
+        "isUsed": { "type": "boolean" },
+        "usedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["accessKey", "isUsed", "createdAt"]
     }
   },
   "auth": {
@@ -111,6 +125,12 @@
         "$ref": "#/backend/entities/MessageLog"
       },
       "description": "Archived communication logs."
+    },
+    "/accessKeys/{keyId}": {
+      "schema": {
+        "$ref": "#/backend/entities/AccessKey"
+      },
+      "description": "Generated invite keys."
     }
   }
 }

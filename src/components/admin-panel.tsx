@@ -30,7 +30,9 @@ import {
   History,
   Target,
   UserRound,
-  LayoutDashboard
+  LayoutDashboard,
+  Copy,
+  Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -56,7 +58,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     if (!db) return null;
     return collection(db, "users");
   }, [db]);
-  const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
+  const { data: users } = useCollection(usersQuery);
 
   const callsignRequestsQuery = useMemoFirebase(() => {
     if (!db) return null;
@@ -75,6 +77,12 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
   }, [db]);
   const { data: messages } = useCollection(messagesQuery);
+
+  const accessKeysQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, "accessKeys"), orderBy("createdAt", "desc"));
+  }, [db]);
+  const { data: accessKeys } = useCollection(accessKeysQuery);
 
   const gatewayRef = useMemoFirebase(() => {
     if (!db) return null;
@@ -104,7 +112,10 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
       isUsed: false,
       createdAt: new Date().toISOString()
     }, { merge: false });
-    setInviteLink(`${window.location.origin}/?invite=${newKey}`);
+    
+    const fullLink = `${window.location.origin}/?invite=${newKey}`;
+    setInviteLink(fullLink);
+    toast({ title: "INVITE_KEY_PROVISIONED" });
   };
 
   const handleApproveCallsign = async (request: any) => {
@@ -172,7 +183,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.5.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase text-primary">Command Terminal v1.6.0</CardTitle>
           </div>
           <div className="flex items-center space-x-2">
             {onReturnToChat && (
@@ -372,8 +383,8 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
             </TabsContent>
 
             {isRegistryAdmin && (
-              <TabsContent value="system" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <TabsContent value="system" className="flex-1 overflow-auto space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
                   <Card className="bg-secondary/20 border-border">
                     <CardHeader className="flex flex-row items-center space-x-2">
                       <Globe className="w-4 h-4 text-primary" />
@@ -403,15 +414,65 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                       <CardTitle className="text-xs uppercase text-primary">Operative Provisioning</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>
+                      <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-10">
+                        <Plus className="w-4 h-4 mr-2" />
+                        PROVISION_NEW_KEY
+                      </Button>
                       {inviteLink && (
-                        <div className="p-2 bg-background border border-primary/30 rounded flex space-x-2">
-                          <Input readOnly value={inviteLink} className="text-[9px] font-mono h-6" />
-                          <Button size="sm" onClick={() => navigator.clipboard.writeText(inviteLink)} className="h-6 text-[9px]">COPY</Button>
+                        <div className="p-3 bg-background border border-primary/30 rounded flex flex-col space-y-2">
+                          <span className="text-[8px] uppercase font-bold text-primary">NEW_INVITE_LINK:</span>
+                          <div className="flex space-x-2">
+                            <Input readOnly value={inviteLink} className="text-[9px] font-mono h-8 bg-secondary/30" />
+                            <Button size="icon" onClick={() => {
+                              navigator.clipboard.writeText(inviteLink);
+                              toast({ title: "COPIED_TO_BUFFER" });
+                            }} className="h-8 w-8">
+                              <Copy className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </CardContent>
                   </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center">
+                    <History className="w-3.5 h-3.5 mr-2" />
+                    Invite_Log
+                  </h3>
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-secondary/30">
+                        <TableRow className="border-border">
+                          <TableHead className="text-[9px] uppercase">Key</TableHead>
+                          <TableHead className="text-[9px] uppercase">Created</TableHead>
+                          <TableHead className="text-[9px] uppercase">Status</TableHead>
+                          <TableHead className="text-[9px] uppercase text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accessKeys?.map((key) => (
+                          <TableRow key={key.id} className="border-border bg-card/50">
+                            <TableCell className="font-mono text-xs">{key.accessKey}</TableCell>
+                            <TableCell className="text-[10px] opacity-50">{new Date(key.createdAt).toLocaleString()}</TableCell>
+                            <TableCell>
+                              {key.isUsed ? (
+                                <Badge variant="outline" className="text-[8px] border-green-500/30 text-green-500">EXPENDED</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[8px] border-primary/30 text-primary">ACTIVE</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/50 hover:text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, "accessKeys", key.id))}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </TabsContent>
             )}

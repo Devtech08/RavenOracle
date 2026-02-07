@@ -5,10 +5,10 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck } from "lucide-react";
+import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
@@ -25,14 +25,42 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   const [requestId, setRequestId] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
+  const [activeInviteDocId, setActiveInviteDocId] = useState<string | null>(null);
+  
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
   const searchParams = useSearchParams();
 
-  const isInvited = !!searchParams.get("invite");
+  const inviteKey = searchParams.get("invite");
   const isWarrior = callsign.trim().toUpperCase() === "WARRIOR";
   const isBypass = isAdminMode || isWarrior;
+
+  // Validate invite key once on mount
+  useEffect(() => {
+    async function validateInvite() {
+      if (!inviteKey || !db) return;
+      
+      const q = query(collection(db, "accessKeys"), where("accessKey", "==", inviteKey), where("isUsed", "==", false));
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        setInviteValid(true);
+        setActiveInviteDocId(snap.docs[0].id);
+      } else {
+        setInviteValid(false);
+        toast({ 
+          variant: "destructive", 
+          title: "INVALID_OR_EXPIRED_INVITE", 
+          description: "Proceeding as standard operative." 
+        });
+      }
+    }
+    validateInvite();
+  }, [inviteKey, db, toast]);
+
+  const isInvited = inviteValid === true;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -77,7 +105,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           createSessionRequest(cleanCallsign);
           setStep("wait_approval");
         } else {
-          // Invited user
+          // Valid Invited user
           setStep("biometric");
         }
       } else {
@@ -103,6 +131,15 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     if (!faceData || !user) return;
     setIsLoading(true);
     
+    // Mark invite as used if applicable
+    if (activeInviteDocId) {
+      updateDocumentNonBlocking(doc(db, "accessKeys", activeInviteDocId), {
+        isUsed: true,
+        usedBy: user.uid,
+        usedAt: new Date().toISOString()
+      });
+    }
+
     setDocumentNonBlocking(doc(db, "users", user.uid), {
       id: user.uid,
       callsign: callsign.toUpperCase(),
@@ -154,9 +191,16 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">
           {isBypass ? "Command ID" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
         </h2>
-        <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
-          {isBypass ? "Verified bypass detected. State command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
-        </p>
+        <div className="flex flex-col items-center space-y-1">
+          <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
+            {isBypass ? "Verified bypass detected. State command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
+          </p>
+          {isInvited && step === "callsign" && (
+            <Badge variant="outline" className="text-[8px] border-primary/40 text-primary mt-1">
+              PROVISIONED_INVITE_ACTIVE
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="max-w-xs mx-auto w-full space-y-6">
@@ -213,18 +257,10 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
                <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
             </div>
             
-            {isInvited && !faceData && !isBypass && (
-               <div className="py-2">
-                  <FaceCapture onCapture={handleFaceCapture} label="ACCESS_VALIDATION" />
-               </div>
-            )}
-
             <form onSubmit={handleFinalVerify} className="space-y-4">
-              {(!isInvited || faceData || isBypass) && (
-                <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
-                  {requestData?.sessionCode}
-                </div>
-              )}
+              <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
+                {requestData?.sessionCode}
+              </div>
               <Input
                 type="password"
                 placeholder="ENTER_SESSION_CODE"
@@ -232,11 +268,9 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
                 onChange={(e) => setCode(e.target.value)}
                 className="bg-secondary/50 border-border text-center tracking-widest h-12"
                 autoFocus
-                disabled={isInvited && !faceData && !isBypass}
               />
               <Button 
                 type="submit" 
-                disabled={isInvited && !faceData && !isBypass}
                 className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
               >
                 ENTER_PORTAL
@@ -251,7 +285,9 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         <p>
           {isBypass
             ? "Administrative bypass active. Secure identity tunnel established for command callsign."
-            : "Session access requires manual administrator authorization."}
+            : isInvited 
+              ? "Provisioned invite detected. Biometric hashing required for identity finalization." 
+              : "Session access requires manual administrator authorization."}
         </p>
       </div>
     </div>

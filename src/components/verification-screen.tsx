@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -210,7 +210,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         {step === "final_verification" && (
           <div className="space-y-6">
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
-               <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
+               <CircleCheck className="w-8 h-8 text-green-500 mb-2" />
                <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
                <p className="text-[10px] opacity-60">Identity validation successful</p>
             </div>

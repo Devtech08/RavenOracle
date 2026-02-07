@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Camera, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Camera, RefreshCw, CircleCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FaceCaptureProps {
@@ -117,7 +117,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
       
       {isCaptured && (
         <div className="flex items-center space-x-2 text-green-500 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4" />
+          <CircleCheck className="w-4 h-4" />
           <span className="text-[10px] font-bold uppercase tracking-widest">Biometric_Locked</span>
         </div>
       )}

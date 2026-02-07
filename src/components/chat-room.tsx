@@ -48,11 +48,16 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const [recipientInput, setRecipientInput] = useState("ALL");
   const [newCallsign, setNewCallsign] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
-  const [sessionStartTime] = useState<Timestamp>(Timestamp.now());
+  const [sessionStartTime, setSessionStartTime] = useState<Timestamp | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
+
+  useEffect(() => {
+    // Avoid hydration mismatch by setting the timestamp on mount
+    setSessionStartTime(Timestamp.now());
+  }, []);
 
   const userDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
@@ -64,7 +69,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
   // Real-time listener for current session messages
   const messagesQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !sessionStartTime) return null;
     
     if (isAdmin) {
       // Admins see everything
@@ -236,7 +241,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
         <div className="space-y-6 pb-4">
           <div className="flex flex-col items-center py-8 opacity-20">
              <div className="w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent mb-4" />
-             <p className="text-[10px] uppercase tracking-[0.5em]">Session Start: {sessionStartTime.toDate().toLocaleTimeString()}</p>
+             <p className="text-[10px] uppercase tracking-[0.5em]">Session Start: {sessionStartTime?.toDate().toLocaleTimeString() || '...'}</p>
              <div className="w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent mt-4" />
           </div>
 
@@ -310,4 +315,3 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     </div>
   );
 }
-

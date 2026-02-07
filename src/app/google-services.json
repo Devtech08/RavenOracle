@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "579496960065",
+    "project_id": "studio-1124454172-c41ea",
+    "storage_bucket": "studio-1124454172-c41ea.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:579496960065:android:4e5cd8746373f5c2f866c0",
+        "android_client_info": {
+          "package_name": "Raven.Oracle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIyaF13RlzIBY20khrzWVtTYJzqv23Qxk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

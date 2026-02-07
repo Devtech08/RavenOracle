@@ -3,14 +3,20 @@
     {
       "id": "raven-emblem",
       "description": "A mysterious glowing raven emblem",
-      "imageUrl": "https://images.unsplash.com/photo-1650200339857-ab58b16edf4f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxteXN0aWMlMjByYXZlbnxlbnwwfHx8fDE3NzA0ODIzNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1574133492063-8e3764cfbef1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxteXN0aWMlMjByYXZlbnxlbnwwfHx8fDE3NzA0ODIzNTR8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "mystic raven"
     },
     {
       "id": "secure-vault",
       "description": "A high-tech digital vault with cyan highlights",
-      "imageUrl": "https://images.unsplash.com/photo-1632910138458-5bf601f3835e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxjeWJlciUyMHNlY3VyaXR5fGVufDB8fHx8MTc3MDM4NTU5MHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1517430816045-df4b7de11d1d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8Y3liZXIlMjBzZWN1cml0eXxlbnwwfHx8fDE3NzAzODU1OTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "cyber security"
+    },
+    {
+      "id": "portal-logo",
+      "description": "Custom Raven Oracle Logo",
+      "imageUrl": "/logo.png",
+      "imageHint": "custom logo"
     }
   ]
 }

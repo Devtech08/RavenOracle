@@ -12,6 +12,12 @@
       "description": "A high-tech digital vault with cyan highlights",
       "imageUrl": "https://picsum.photos/seed/vault22/1200/800",
       "imageHint": "cyber security"
+    },
+    {
+      "id": "portal-logo",
+      "description": "Custom Raven Oracle Logo",
+      "imageUrl": "/logo.png",
+      "imageHint": "custom logo"
     }
   ]
 }

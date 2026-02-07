@@ -8,6 +8,7 @@ A high-security, futuristic communication platform designed for discrete operati
 - **Framework**: Next.js 15 (App Router)
 - **Styling**: Tailwind CSS with ShadCN UI components
 - **Backend**: Firebase (Firestore & Authentication)
+- **AI/GenAI**: Genkit (Agentic reasoning and automation)
 - **Icons**: Lucide React
 - **Typography**: Source Code Pro (Monospace focus)
 
@@ -37,7 +38,7 @@ To ensure maximum security, standard operatives must undergo the following seque
 ## 🛡️ Feature Breakdown
 
 ### 1. Secure Communication Hub
-- **Targeted Messaging**: Users can broadcast to `ALL` or target specific callsigns (e.g., `WARRIOR`).
+- **Targeted Messaging**: Users can broadcast to `ALL` or target specific callsigns.
 - **File Transmissions**: Securely attach and share data fragments (images or documents) within the communication stream.
 - **Session-Locked History**: Operatives only see communications transmitted since their specific session began. History is purged locally on termination.
 - **Command Broadcasts**: Administrators can transmit priority orders to individuals or the entire team.
@@ -45,17 +46,9 @@ To ensure maximum security, standard operatives must undergo the following seque
 ### 2. Command Terminal (Admin Panel)
 - **Access Queues**: Manage and authorize pending session requests from operatives.
 - **Operative Registry**: Full view of all registered subjects and their status.
-- **Termination Control**: Admins can instantly block or purge any operative, forcing an immediate session disconnect.
+- **Termination Control**: Only admins can instantly block or purge any operative, forcing an immediate session disconnect.
 - **Identity Tasks**: Authorize or reject requested callsign shifts.
 - **System Config**: Update gateway sequences and provision invite-only biometric links.
-
-## 🛠️ Getting Started
-
-To run this project locally:
-1. Ensure your environment has the necessary Firebase configuration in `src/firebase/config.ts`.
-2. Use the following commands:
-   - `npm run dev`: Starts the Next.js development server.
-   - `npm run build`: Compiles the application for production.
 
 ---
 *The shadows hold your secrets. Encrypted end-to-end.*

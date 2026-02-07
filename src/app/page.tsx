@@ -73,7 +73,7 @@ function RavenOracleApp() {
     setPhase("gateway");
   };
 
-  if (isUserLoading || (user && isAdminLoading)) {
+  if (isUserLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background font-body text-primary animate-pulse tracking-[0.5em]">
         INITIALIZING_ORACLE...
@@ -99,6 +99,7 @@ function RavenOracleApp() {
 
       {phase === "admin" && (isAdmin || isAdminEntry) && (
         <AdminPanel 
+          isRegistryAdmin={isAdmin}
           onClose={handleSessionEnd} 
         />
       )}

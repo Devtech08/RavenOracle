@@ -15,7 +15,8 @@ import {
   Ban,
   Check,
   Zap,
-  Globe
+  Globe,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
@@ -23,30 +24,44 @@ import { collection, doc } from "firebase/firestore";
 
 interface AdminPanelProps {
   onClose: () => void;
+  isRegistryAdmin: boolean;
 }
 
-export function AdminPanel({ onClose }: AdminPanelProps) {
+export function AdminPanel({ onClose, isRegistryAdmin }: AdminPanelProps) {
   const [newGateway, setNewGateway] = useState("");
   const [newAdminGateway, setNewAdminGateway] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const { toast } = useToast();
   const db = useFirestore();
 
-  const usersQuery = useMemoFirebase(() => collection(db, "users"), [db]);
-  const { data: users } = useCollection(usersQuery);
+  // Guard queries to only run when the user is officially recognized as an admin in Firestore
+  const usersQuery = useMemoFirebase(() => {
+    if (!db || !isRegistryAdmin) return null;
+    return collection(db, "users");
+  }, [db, isRegistryAdmin]);
+  const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
-  const callsignRequestsQuery = useMemoFirebase(() => collection(db, "callsignRequests"), [db]);
+  const callsignRequestsQuery = useMemoFirebase(() => {
+    if (!db || !isRegistryAdmin) return null;
+    return collection(db, "callsignRequests");
+  }, [db, isRegistryAdmin]);
   const { data: callsignRequests } = useCollection(callsignRequestsQuery);
 
-  const sessionRequestsQuery = useMemoFirebase(() => collection(db, "sessionRequests"), [db]);
+  const sessionRequestsQuery = useMemoFirebase(() => {
+    if (!db || !isRegistryAdmin) return null;
+    return collection(db, "sessionRequests");
+  }, [db, isRegistryAdmin]);
   const { data: sessionRequests } = useCollection(sessionRequestsQuery);
 
-  const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
+  const gatewayRef = useMemoFirebase(() => {
+    if (!db || !isRegistryAdmin) return null;
+    return doc(db, "gateway", "default");
+  }, [db, isRegistryAdmin]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
   const handleUpdateGateway = (type: 'user' | 'admin') => {
     const value = type === 'user' ? newGateway : newAdminGateway;
-    if (!value.trim()) return;
+    if (!value.trim() || !gatewayRef) return;
     
     setDocumentNonBlocking(gatewayRef, {
       [type === 'user' ? 'gatewayAddress' : 'adminAddress']: value.trim().toLowerCase(),
@@ -96,6 +111,17 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
     }
   };
 
+  if (!isRegistryAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="text-primary font-mono text-xs tracking-widest animate-pulse">PROVISIONING_COMMAND_AUTHORITY...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md animate-fade-in">
       <Card className="w-full max-w-5xl h-[85vh] bg-card/95 border-primary/20 shadow-2xl flex flex-col overflow-hidden">
@@ -121,7 +147,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             <TabsContent value="sessions" className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-primary uppercase text-[10px]">Operative</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Request_ID</TableHead>
@@ -158,7 +184,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             <TabsContent value="members" className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-primary uppercase text-[10px]">Callsign</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Biometrics</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
@@ -191,6 +217,11 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {usersLoading && (
+                     <TableRow>
+                       <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">LOADING_REGISTRY...</TableCell>
+                     </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </TabsContent>
@@ -198,7 +229,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             <TabsContent value="requests" className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-primary text-[10px]">Current</TableHead>
                     <TableHead className="text-primary text-[10px]">Requested</TableHead>
                     <TableHead className="text-primary text-[10px] text-right">Decision</TableHead>

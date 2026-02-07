@@ -30,7 +30,9 @@ function RavenOracleApp() {
   }, [db, user]);
   
   const { data: adminData } = useDoc(adminDocRef);
-  const isAdmin = !!adminData;
+  
+  // Consolidate admin authority: Either they entered via raven.admin OR they have a role in the registry
+  const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
   const handleGatewaySuccess = (isAdminMode: boolean) => {
     setIsAdminEntry(isAdminMode);
@@ -39,7 +41,7 @@ function RavenOracleApp() {
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
     if (user) {
-      const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || key === "WARRIOR_ENTRY" || isAdmin || callsign.toUpperCase() === "WARRIOR";
+      const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || key === "WARRIOR_ENTRY" || isUserAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
       setDocumentNonBlocking(doc(db, "users", user.uid), {
@@ -54,8 +56,8 @@ function RavenOracleApp() {
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
         setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
         
-        // If they used the admin gate, go straight to Admin Terminal
-        // If they used the user gate, go to Chat as a "normal user" first
+        // If they used raven.admin, go straight to Admin Terminal
+        // If they used raven.oracle, they enter as a "normal user" first
         if (isAdminEntry) {
           setPhase("admin");
         } else {
@@ -69,7 +71,7 @@ function RavenOracleApp() {
   };
 
   const handleToggleAdmin = () => {
-    if (isAdmin || isAdminEntry || sessionData?.callsign === "WARRIOR") {
+    if (isUserAdmin) {
       setPhase(phase === "admin" ? "chat" : "admin");
     }
   };
@@ -99,14 +101,14 @@ function RavenOracleApp() {
           callsign={sessionData.callsign}
           sessionKey={sessionData.key} 
           onLogout={handleSessionEnd} 
-          isAdmin={isAdmin || isAdminEntry || sessionData.callsign === "WARRIOR"}
+          isAdmin={isUserAdmin}
           onOpenAdmin={handleToggleAdmin}
         />
       )}
 
-      {phase === "admin" && (isAdmin || isAdminEntry || sessionData?.callsign === "WARRIOR") && (
+      {phase === "admin" && isUserAdmin && (
         <AdminPanel 
-          isRegistryAdmin={isAdmin}
+          isRegistryAdmin={!!adminData}
           onClose={handleSessionEnd} 
           onReturnToChat={handleToggleAdmin}
         />

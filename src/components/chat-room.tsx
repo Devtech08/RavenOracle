@@ -61,7 +61,6 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const messagesQuery = useMemoFirebase(() => {
     if (!db || !sessionStartTime) return null;
     
-    // Normal users only see messages from their current session
     return query(
       collection(db, "messageLogs"),
       where("timestamp", ">=", sessionStartTime),
@@ -149,7 +148,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" size="sm" className="text-[10px] opacity-70 hover:opacity-100">
@@ -178,13 +177,18 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
           </Dialog>
 
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={onOpenAdmin} className="text-[10px] border-primary/50 text-primary">
-              <Settings className="w-3 h-3 mr-2" />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onOpenAdmin} 
+              className="text-[10px] border-primary/50 text-primary font-bold tracking-widest px-4 h-8 transition-all hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(0,255,255,0.2)]"
+            >
+              <Settings className="w-3.5 h-3.5 mr-2 text-primary" />
               ADMIN
             </Button>
           )}
 
-          <Button variant="ghost" size="sm" onClick={onLogout} className="text-muted-foreground hover:text-destructive">
+          <Button variant="ghost" size="sm" onClick={onLogout} className="text-muted-foreground hover:text-destructive text-[10px] uppercase font-bold">
             <LogOut className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Terminate</span>
           </Button>
@@ -207,7 +211,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 </span>
                 <span className="text-[10px] opacity-40">{msg.timestamp}</span>
               </div>
-              <div className={`max-w-[85%] p-3 rounded-lg text-sm border ${msg.isMe ? 'bg-primary text-primary-foreground border-primary/20' : 'bg-secondary text-foreground border-border'}`}>
+              <div className={`max-w-[85%] p-3 rounded-lg text-sm border ${msg.isMe ? 'bg-primary text-primary-foreground border-primary/20 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'bg-secondary text-foreground border-border'}`}>
                 {msg.content}
               </div>
             </div>
@@ -241,9 +245,9 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Communicate..."
-              className="flex-1 bg-background/50 border-border h-10"
+              className="flex-1 bg-background/50 border-border h-10 font-mono text-sm"
             />
-            <Button type="submit" size="icon" disabled={!input.trim()} className="bg-primary text-primary-foreground h-10 w-10">
+            <Button type="submit" size="icon" disabled={!input.trim()} className="bg-primary text-primary-foreground h-10 w-10 shadow-[0_0_10px_rgba(0,255,255,0.2)]">
               <Send className="w-4 h-4" />
             </Button>
           </div>

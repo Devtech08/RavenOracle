@@ -77,9 +77,12 @@
         "userId": { "type": "string" },
         "recipient": { "type": "string", "description": "The target callsign or 'ALL'." },
         "content": { "type": "string" },
+        "fileData": { "type": "string", "description": "Base64 encoded file data." },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["sender", "userId", "recipient", "content", "timestamp"]
+      "required": ["sender", "userId", "recipient", "timestamp"]
     },
     "AccessKey": {
       "$schema": "http://json-schema.org/draft-07/schema#",

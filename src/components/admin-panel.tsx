@@ -33,7 +33,9 @@ import {
   LayoutDashboard,
   Copy,
   Plus,
-  RotateCcw
+  RotateCcw,
+  FileIcon,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -359,8 +361,17 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                             <span className="opacity-40">→</span>
                             <span className="opacity-70">{msg.recipient}</span>
                           </div>
-                          <div className={`text-xs p-2 rounded border ${msg.sender === 'WARRIOR' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
-                            {msg.content}
+                          <div className={`text-xs p-2 rounded border flex flex-col space-y-2 ${msg.sender === 'WARRIOR' ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-secondary/50 border-border text-foreground'}`}>
+                            {msg.fileData && (
+                              <div className="bg-background/20 rounded-md p-2 border border-foreground/10 flex items-center space-x-2">
+                                <FileIcon className="w-3 h-3 opacity-70" />
+                                <span className="text-[9px] font-mono truncate max-w-[200px]">{msg.fileName}</span>
+                                <a href={msg.fileData} download={msg.fileName} className="ml-auto hover:text-primary transition-colors">
+                                  <Download className="w-3 h-3" />
+                                </a>
+                              </div>
+                            )}
+                            {msg.content && <div>{msg.content}</div>}
                           </div>
                         </div>
                       ))}

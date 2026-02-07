@@ -22,7 +22,11 @@ import {
   History,
   Target,
   Settings,
-  Bell
+  Paperclip,
+  FileIcon,
+  X,
+  ImageIcon,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
@@ -43,7 +47,9 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const [newCallsign, setNewCallsign] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Timestamp | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ name: string; type: string; data: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const db = useFirestore();
   const { user } = useUser();
@@ -93,22 +99,51 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     }
   }, [displayMessages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for Firestore document
+        toast({ variant: "destructive", title: "FILE_TOO_LARGE", description: "Secure transmissions are limited to 1MB." });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelectedFile({
+          name: file.name,
+          type: file.type,
+          data: event.target?.result as string
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !user) return;
+    if ((!input.trim() && !selectedFile) || !user) return;
 
     const messageContent = input.trim();
     const target = recipientInput.trim().toUpperCase();
     
-    setInput("");
-
-    addDocumentNonBlocking(collection(db, "messageLogs"), {
+    const messageData: any = {
       sender: currentCallsign,
       userId: user.uid,
       recipient: target,
       content: messageContent,
       timestamp: serverTimestamp()
-    });
+    };
+
+    if (selectedFile) {
+      messageData.fileData = selectedFile.data;
+      messageData.fileName = selectedFile.name;
+      messageData.fileType = selectedFile.type;
+    }
+
+    addDocumentNonBlocking(collection(db, "messageLogs"), messageData);
+
+    setInput("");
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     if (target !== "ALL") {
       toast({ description: `Transmitting to ${target}...` });
@@ -220,8 +255,28 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 </span>
                 <span className="text-[10px] opacity-40">{msg.timestamp}</span>
               </div>
-              <div className={`max-w-[85%] p-3 rounded-lg text-sm border ${msg.isMe ? 'bg-primary text-primary-foreground border-primary/20 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'bg-secondary text-foreground border-border'}`}>
-                {msg.content}
+              <div className={`max-w-[85%] p-3 rounded-lg text-sm border flex flex-col space-y-2 ${msg.isMe ? 'bg-primary text-primary-foreground border-primary/20 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'bg-secondary text-foreground border-border'}`}>
+                {msg.fileData && (
+                  <div className="bg-background/20 rounded-md p-2 border border-foreground/10 flex flex-col space-y-2">
+                    {msg.fileType?.startsWith('image/') ? (
+                      <div className="relative group">
+                        <img src={msg.fileData} alt={msg.fileName} className="max-h-48 rounded object-cover cursor-pointer hover:opacity-90" />
+                        <a href={msg.fileData} download={msg.fileName} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/40 transition-opacity rounded">
+                          <Download className="w-6 h-6 text-white" />
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <FileIcon className="w-4 h-4 opacity-70" />
+                        <span className="text-[10px] font-mono truncate max-w-[150px]">{msg.fileName}</span>
+                        <a href={msg.fileData} download={msg.fileName} className="ml-auto hover:text-primary transition-colors">
+                          <Download className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {msg.content && <div>{msg.content}</div>}
               </div>
             </div>
           ))}
@@ -236,7 +291,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
       <footer className="p-4 border-t border-border bg-secondary/30">
         <form onSubmit={handleSendMessage} className="flex flex-col space-y-3">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 bg-background/50 border border-border rounded px-2 py-1">
               <Target className="w-3 h-3 text-primary opacity-50" />
               <span className="text-[9px] uppercase font-bold text-muted-foreground">To:</span>
@@ -247,16 +302,40 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 placeholder="ALL / ID"
               />
             </div>
+
+            {selectedFile && (
+              <div className="flex items-center space-x-2 bg-primary/10 border border-primary/20 px-2 py-1 rounded">
+                <span className="text-[9px] font-mono text-primary truncate max-w-[120px]">{selectedFile.name}</span>
+                <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent" onClick={() => setSelectedFile(null)}>
+                  <X className="w-3 h-3 text-primary" />
+                </Button>
+              </div>
+            )}
           </div>
           
           <div className="flex space-x-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="icon" 
+              className="h-10 w-10 border-border bg-background/50"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="w-4 h-4 opacity-70" />
+            </Button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={handleFileSelect}
+            />
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Communicate..."
               className="flex-1 bg-background/50 border-border h-10 font-mono text-sm"
             />
-            <Button type="submit" size="icon" disabled={!input.trim()} className="bg-primary text-primary-foreground h-10 w-10 shadow-[0_0_10px_rgba(0,255,255,0.2)]">
+            <Button type="submit" size="icon" disabled={!input.trim() && !selectedFile} className="bg-primary text-primary-foreground h-10 w-10 shadow-[0_0_10px_rgba(0,255,255,0.2)]">
               <Send className="w-4 h-4" />
             </Button>
           </div>

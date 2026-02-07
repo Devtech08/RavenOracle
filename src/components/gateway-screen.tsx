@@ -47,7 +47,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-4 flex flex-col items-center justify-center group">
         
-        {/* Gateway Page Name */}
+        {/* Gateway Page Name - Restored for tactical identity */}
         <h1 className="text-4xl md:text-6xl font-bold tracking-[0.3em] uppercase text-primary mb-8 glow-cyan flicker opacity-90 select-none">
           Raven Oracle
         </h1>

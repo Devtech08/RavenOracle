@@ -6,13 +6,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
   Send, 
   LogOut, 
   Ghost,
   Lock,
-  Settings
+  Settings,
+  UserEdit,
+  User
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
+import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 interface Message {
   id: string;
@@ -30,24 +42,36 @@ interface ChatRoomProps {
   onOpenAdmin: () => void;
 }
 
-export function ChatRoom({ callsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
+export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [newCallsign, setNewCallsign] = useState("");
+  const [isRequesting, setIsRequesting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const db = useFirestore();
+  const { user } = useUser();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid);
+  }, [db, user]);
+  
+  const { data: userData } = useDoc(userDocRef);
+  const currentCallsign = userData?.callsign || initialCallsign;
 
   useEffect(() => {
     const welcome: Message = {
       id: "system-1",
       sender: "ORACLE",
       content: isAdmin 
-        ? `ADMIN_ACCESS_GRANTED: Welcome back, ${callsign}. All past logs decrypted.`
-        : `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${callsign}. Communication is now secure.`,
+        ? `ADMIN_ACCESS_GRANTED: Welcome back, ${currentCallsign}. All past logs decrypted.`
+        : `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${currentCallsign}. Communication is now secure.`,
       timestamp: new Date().toLocaleTimeString(),
       isMe: false,
     };
     setMessages([welcome]);
-  }, [isAdmin, callsign]);
+  }, [isAdmin, currentCallsign]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -64,7 +88,7 @@ export function ChatRoom({ callsign, sessionKey, isAdmin, onLogout, onOpenAdmin 
 
     const newMessage: Message = {
       id: `msg-${Date.now()}`,
-      sender: callsign,
+      sender: currentCallsign,
       content: input,
       timestamp: new Date().toLocaleTimeString(),
       isMe: true,
@@ -73,17 +97,40 @@ export function ChatRoom({ callsign, sessionKey, isAdmin, onLogout, onOpenAdmin 
     setMessages((prev) => [...prev, newMessage]);
     setInput("");
 
-    // Simulated reply for UX feedback
     setTimeout(() => {
       const reply: Message = {
         id: `reply-${Date.now()}`,
         sender: "ORACLE",
-        content: `Acknowledged, ${callsign}. Sequence ${Math.random().toString(36).substring(7).toUpperCase()} recorded.`,
+        content: `Acknowledged, ${currentCallsign}. Sequence ${Math.random().toString(36).substring(7).toUpperCase()} recorded.`,
         timestamp: new Date().toLocaleTimeString(),
         isMe: false,
       };
       setMessages((prev) => [...prev, reply]);
     }, 1500);
+  };
+
+  const handleRequestCallsign = async () => {
+    if (!newCallsign.trim() || !user) return;
+    setIsRequesting(true);
+    
+    try {
+      const requestId = Math.random().toString(36).substring(7);
+      await setDoc(doc(db, "callsignRequests", requestId), {
+        id: requestId,
+        userId: user.uid,
+        currentCallsign: currentCallsign,
+        requestedCallsign: newCallsign.trim().toUpperCase(),
+        status: "pending",
+        timestamp: new Date().toISOString()
+      });
+      
+      toast({ title: "REQUEST_SUBMITTED", description: "Admin approval required for callsign update." });
+      setNewCallsign("");
+    } catch (e) {
+      toast({ variant: "destructive", title: "REQUEST_FAILED" });
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   return (
@@ -97,12 +144,43 @@ export function ChatRoom({ callsign, sessionKey, isAdmin, onLogout, onOpenAdmin 
             <h1 className="text-sm font-bold tracking-widest uppercase text-primary">Raven Oracle</h1>
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <span>Identity: {callsign}</span>
+              <span>Identity: {currentCallsign}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-xs opacity-70 hover:opacity-100">
+                <User className="w-3 h-3 mr-2" />
+                PROFILE
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-primary text-sm uppercase tracking-widest">Update Callsign</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase opacity-50">New Callsign</label>
+                  <Input 
+                    value={newCallsign}
+                    onChange={(e) => setNewCallsign(e.target.value)}
+                    placeholder="ENTER_NEW_CALLSIGN"
+                    className="bg-secondary/50 font-mono uppercase"
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">Note: Identity changes require Oracle Administrator approval.</p>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleRequestCallsign} disabled={isRequesting || !newCallsign} className="bg-primary text-primary-foreground text-xs w-full font-bold">
+                  SUBMIT_CHANGE_REQUEST
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {isAdmin && (
             <Button
               variant="outline"

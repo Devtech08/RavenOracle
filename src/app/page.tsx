@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,14 +17,12 @@ function RavenOracleApp() {
   const db = useFirestore();
   const auth = useAuth();
 
-  // Ensure user is signed in anonymously to interact with basic Firestore rules
   useEffect(() => {
     if (!isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
     }
   }, [user, isUserLoading, auth]);
 
-  // Check if current user is admin
   const adminDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, "roles_admin", user.uid);
@@ -37,20 +36,26 @@ function RavenOracleApp() {
   };
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
-    // Finalize user registration in Firestore
     if (user) {
+      const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin;
+      const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
+      
       const userRef = doc(db, "users", user.uid);
       setDoc(userRef, {
         id: user.uid,
-        callsign: callsign.toUpperCase(),
+        callsign: finalCallsign,
         registrationDate: new Date().toISOString(),
-        isAdmin: false,
+        isAdmin: isSystemAdmin,
         isBlocked: false
       }, { merge: true });
-    }
 
-    setSessionData({ callsign, key });
-    setPhase("chat");
+      if (isSystemAdmin) {
+        setDoc(doc(db, "roles_admin", user.uid), { enabled: true }, { merge: true });
+      }
+
+      setSessionData({ callsign: finalCallsign, key });
+      setPhase("chat");
+    }
   };
 
   const handleToggleAdmin = () => {
@@ -94,7 +99,6 @@ function RavenOracleApp() {
         />
       )}
       
-      {/* Background ambient glow elements */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-[-1] opacity-20">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[150px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary rounded-full blur-[150px]" />

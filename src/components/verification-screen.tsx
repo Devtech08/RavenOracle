@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck } from "lucide-react";
+import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck, Fingerprint } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking, useCollection } from "@/firebase";
 import { doc, collection, query, where, getDocs } from "firebase/firestore";
@@ -15,7 +16,7 @@ interface VerificationScreenProps {
   isAdminMode: boolean;
 }
 
-type VerificationStep = "callsign" | "wait_approval" | "biometric" | "final_verification";
+type VerificationStep = "callsign" | "wait_approval" | "biometric_choice" | "biometric_face" | "biometric_fingerprint" | "final_verification";
 
 function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps) {
   const [step, setStep] = useState<VerificationStep>("callsign");
@@ -51,8 +52,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
   useEffect(() => {
     if (requestData?.status === "approved" && step === "wait_approval") {
-      setStep("biometric");
-      toast({ title: "ACCESS_AUTHORIZED", description: "Clearance granted. Biometric scan required." });
+      setStep("biometric_choice");
+      toast({ title: "ACCESS_AUTHORIZED", description: "Clearance granted. Select biometric method." });
     }
   }, [requestData, step, toast]);
 
@@ -67,15 +68,15 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     const userSnap = await getDocs(usersQuery);
     const isRegistered = !userSnap.empty;
 
+    // Check if callsign matches the current user or is a new registration
     if (isFirstAdminRegistration) {
-      setStep("biometric");
+      setStep("biometric_choice");
       setIsLoading(false);
       return;
     }
 
     if (isAdminMode && isWarriorCallsign && adminExists) {
-      // Admins skip the queue but still need biometric scan on first-time login
-      setStep("biometric");
+      setStep("biometric_choice");
       setIsLoading(false);
       return;
     }
@@ -104,12 +105,64 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     setIsLoading(false);
   };
 
+  const handleFingerprintAuth = async () => {
+    if (!window.PublicKeyCredential) {
+      toast({ variant: "destructive", title: "HARDWARE_NOT_SUPPORTED", description: "This device lacks hardware biometric support." });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Note: In a production app, these challenges would come from the server
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      const options: any = {
+        publicKey: {
+          challenge: challenge,
+          rp: { name: "Raven Oracle" },
+          user: {
+            id: Uint8Array.from(user?.uid || "user", c => c.charCodeAt(0)),
+            name: callsign,
+            displayName: callsign
+          },
+          pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+          authenticatorSelection: { authenticatorAttachment: "platform" },
+          timeout: 60000
+        }
+      };
+
+      await navigator.credentials.create(options);
+      
+      toast({ title: "FINGERPRINT_LINKED", description: "Hardware biometric successfully registered." });
+      
+      if (user && db) {
+        setDocumentNonBlocking(doc(db, "users", user.uid), {
+          biometricType: 'fingerprint',
+          lastSessionStart: new Date().toISOString()
+        }, { merge: true });
+      }
+
+      if (isAdminMode || isFirstAdminRegistration) {
+        onVerify(callsign.toUpperCase(), "ADMIN_BYPASS");
+      } else {
+        setStep("final_verification");
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ variant: "destructive", title: "SENSOR_ERROR", description: "Biometric link failed. Please retry." });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleBiometricComplete = () => {
-    if (!faceData || !user) return;
+    if (!faceData || !user || !db) return;
     setIsLoading(true);
     
     setDocumentNonBlocking(doc(db, "users", user.uid), {
       faceData: faceData,
+      biometricType: 'face',
       lastSessionStart: new Date().toISOString()
     }, { merge: true });
 
@@ -136,8 +189,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         <div className="p-4 bg-secondary/50 rounded-full mb-2 border border-primary/10">
           {isAdminMode ? (
             <ShieldCheck className="w-8 h-8 text-primary glow-cyan" />
-          ) : step === "biometric" ? (
-            <Camera className="w-8 h-8 text-primary glow-cyan" />
+          ) : step.includes("biometric") ? (
+            step === "biometric_fingerprint" ? <Fingerprint className="w-8 h-8 text-primary glow-cyan animate-pulse" /> : <Camera className="w-8 h-8 text-primary glow-cyan" />
           ) : step === "wait_approval" ? (
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           ) : (
@@ -145,13 +198,15 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           )}
         </div>
         <h2 className="text-lg font-bold text-primary uppercase tracking-widest">
-          {isAdminMode ? "Command Registry" : step === "callsign" ? "Identity Registry" : step === "wait_approval" ? "Approval Queue" : step === "biometric" ? "Biometric Link" : "Access Key"}
+          {isAdminMode ? "Command Registry" : step === "callsign" ? "Identity Registry" : step === "wait_approval" ? "Approval Queue" : step.includes("biometric") ? "Biometric Link" : "Access Key"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest leading-relaxed">
-          {isAdminMode ? "Verified bypass active. First-time login requires visage scan." : 
+          {isAdminMode ? "Verified bypass active. First-time login requires biometric link." : 
            step === "callsign" ? "State your callsign for the Oracle's ledger." : 
            step === "wait_approval" ? "Awaiting manual authorization from WARRIOR." : 
-           step === "biometric" ? "Link visage to active session." : 
+           step === "biometric_choice" ? "Select your biometric linkage method." :
+           step === "biometric_face" ? "Link visage to active session." : 
+           step === "biometric_fingerprint" ? "Scan hardware biometric sensor." :
            "Identity linked. Enter the session unlock code."}
         </p>
       </div>
@@ -189,7 +244,26 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           </div>
         )}
 
-        {step === "biometric" && (
+        {step === "biometric_choice" && (
+          <div className="grid grid-cols-1 gap-4">
+            <Button 
+              onClick={() => setStep("biometric_face")}
+              className="h-20 flex flex-col space-y-2 bg-secondary/30 border border-primary/20 hover:bg-primary/10 group"
+            >
+              <Camera className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-bold tracking-widest">VISAGE_SCAN</span>
+            </Button>
+            <Button 
+              onClick={handleFingerprintAuth}
+              className="h-20 flex flex-col space-y-2 bg-secondary/30 border border-primary/20 hover:bg-primary/10 group"
+            >
+              <Fingerprint className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-bold tracking-widest">HARDWARE_SENSOR</span>
+            </Button>
+          </div>
+        )}
+
+        {step === "biometric_face" && (
           <div className="space-y-4">
             <FaceCapture onCapture={setFaceData} label="SESSION_LINK_SCAN" />
             <Button 
@@ -199,6 +273,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "FINALIZE_SESSION_LINK"}
             </Button>
+            <Button variant="ghost" onClick={() => setStep("biometric_choice")} className="w-full text-[8px] opacity-50 uppercase">Change method</Button>
           </div>
         )}
 
@@ -206,7 +281,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           <div className="space-y-6">
             <div className="p-4 bg-primary/5 border border-primary/20 rounded flex flex-col items-center text-center">
                <CircleCheck className="w-6 h-6 text-primary mb-2 glow-cyan" />
-               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Visage Linked</p>
+               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Biometric Linked</p>
             </div>
             
             <form onSubmit={handleFinalVerify} className="space-y-4">

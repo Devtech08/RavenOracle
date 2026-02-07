@@ -4,7 +4,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
-import Image from "next/image";
 
 interface GatewayScreenProps {
   onUnlock: (isAdminMode: boolean) => void;
@@ -46,16 +45,15 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
-      {/* Visual Header Icon */}
       <div className="mb-12 flex flex-col items-center justify-center group">
-        {/* Custom Logo Integration */}
-        <div className="mb-6 relative w-24 h-24 flex items-center justify-center overflow-hidden">
+        {/* Custom Logo Integration - Expects logo.jpeg in public/ */}
+        <div className="mb-6 relative w-24 h-24 flex items-center justify-center">
           <img 
-            src="/logo.png" 
+            src="/logo.jpeg" 
             alt="PROVISION_LOGO" 
-            className="w-full h-full object-contain opacity-60 group-hover:opacity-100 transition-all duration-500 scale-95 group-hover:scale-100 glow-cyan"
+            className="w-full h-full object-contain opacity-60 group-hover:opacity-100 transition-all duration-500 scale-95 group-hover:scale-100 glow-cyan filter brightness-125"
             onError={(e) => {
-              // Gracefully hide the container if the logo is not yet uploaded
+              // Hide the container if the logo is missing
               (e.currentTarget.parentElement as HTMLElement).style.display = 'none';
             }}
           />

@@ -48,22 +48,27 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-8 flex flex-col items-center justify-center group">
         
-        {/* Logo Container - Explicitly targeting /logo.jpeg at project root */}
-        <div className="mb-8 relative w-40 h-40 flex flex-col items-center justify-center">
+        {/* Identity Emblem Container */}
+        <div className="mb-8 relative w-48 h-48 flex flex-col items-center justify-center">
           {logoExists ? (
             <img 
               src="/logo.jpeg" 
               alt="IDENTITY_EMBLEM" 
-              className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-110 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
+              className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-105 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
               onError={() => setLogoExists(false)}
             />
           ) : (
-            <div className="w-full h-full border border-dashed border-primary/30 rounded-lg flex items-center justify-center animate-pulse">
-               <div className="flex flex-col items-center text-center space-y-2 p-4">
-                 <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Identity_Link_Pending</span>
-                 <span className="text-[8px] text-primary/40 uppercase tracking-[0.1em]">
-                   Drop logo.jpeg into<br/>root public/ folder
-                 </span>
+            <div className="w-full h-full border-2 border-dashed border-primary/20 rounded-xl flex items-center justify-center animate-pulse bg-primary/5">
+               <div className="flex flex-col items-center text-center space-y-3 p-6">
+                 <div className="w-12 h-12 rounded-full border border-primary/30 flex items-center justify-center">
+                   <span className="text-primary text-xl font-bold">?</span>
+                 </div>
+                 <div className="space-y-1">
+                   <span className="text-[10px] text-primary font-bold uppercase tracking-widest block">Identity_Link_Pending</span>
+                   <span className="text-[8px] text-primary/40 uppercase tracking-[0.1em] block">
+                     Upload logo.jpeg to<br/>root public/ directory
+                   </span>
+                 </div>
                </div>
             </div>
           )}

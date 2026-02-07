@@ -1,0 +1,6 @@
+ORACLE IDENTITY ASSET DROPZONE
+------------------------------
+Place your 'logo.jpeg' file in this folder to brand the Gateway Terminal.
+The Raven Oracle expects an identity link to proceed with secure operative sessions.
+
+-- WARRIOR

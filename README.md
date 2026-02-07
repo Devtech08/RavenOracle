@@ -17,6 +17,7 @@ To update the main gateway emblem:
 - Ensure there is a folder named `public` at the **root of your project** (outside the `src` folder).
 - Upload your logo file to that root `public/` directory.
 - Ensure the filename is exactly `logo.jpeg`.
+- The system will automatically detect and apply the cyan glow effects to the emblem.
 
 ## 🔑 Access Control & Identity
 

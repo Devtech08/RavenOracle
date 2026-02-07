@@ -19,7 +19,8 @@ export function initializeFirebase() {
     // Explicitly provide config to prevent app/no-options error during SSR/Hydration
     firebaseApp = initializeApp(firebaseConfig);
   } catch (e) {
-    firebaseApp = getApp();
+    // Fallback to project config if initialization fails to ensure SDK has options
+    firebaseApp = initializeApp(firebaseConfig, "RavenOracleFallback");
   }
 
   return getSdks(firebaseApp);

@@ -48,7 +48,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
       <div className="mb-8 flex flex-col items-center justify-center group">
         
         {/* Isolated Identity Emblem */}
-        <div className="mb-6 relative w-56 h-56 flex flex-col items-center justify-center bg-transparent isolate overflow-hidden">
+        <div className="mb-6 relative w-56 h-56 flex flex-col items-center justify-center bg-transparent overflow-hidden">
           {logoExists ? (
             <img 
               src="/logo.jpeg" 

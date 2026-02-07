@@ -24,7 +24,7 @@ function RavenOracleApp() {
 
   // Persistence: Restore state on mount
   useEffect(() => {
-    const saved = localStorage.getItem("raven_oracle_session_v4");
+    const saved = localStorage.getItem("raven_oracle_active_session");
     if (saved) {
       try {
         const { phase: p, isAdminEntry: i, sessionData: s } = JSON.parse(saved);
@@ -41,7 +41,7 @@ function RavenOracleApp() {
   // Persistence: Save state on change
   useEffect(() => {
     if (isHydrated) {
-      localStorage.setItem("raven_oracle_session_v4", JSON.stringify({
+      localStorage.setItem("raven_oracle_active_session", JSON.stringify({
         phase,
         isAdminEntry,
         sessionData
@@ -49,6 +49,7 @@ function RavenOracleApp() {
     }
   }, [phase, isAdminEntry, sessionData, isHydrated]);
 
+  // Auth: Ensure anonymous session is active
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
@@ -69,6 +70,7 @@ function RavenOracleApp() {
 
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
+  // Real-time notification for admins
   const pendingRequestsQuery = useMemoFirebase(() => {
     if (!db || !user || !isUserAdmin) return null;
     return query(collection(db, "sessionRequests"), where("status", "==", "pending"));
@@ -98,12 +100,13 @@ function RavenOracleApp() {
     }
   }, [pendingRequests, isUserAdmin, toast, user]);
 
+  // Block logic
   useEffect(() => {
     if (userData?.isBlocked && phase !== "gateway") {
       setPhase("gateway");
       setSessionData(null);
       setIsAdminEntry(false);
-      localStorage.removeItem("raven_oracle_session_v4");
+      localStorage.removeItem("raven_oracle_active_session");
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 
@@ -151,7 +154,7 @@ function RavenOracleApp() {
     setSessionData(null);
     setIsAdminEntry(false);
     setPhase("gateway");
-    localStorage.removeItem("raven_oracle_session_v4");
+    localStorage.removeItem("raven_oracle_active_session");
   };
 
   if (isUserLoading || !isHydrated) {

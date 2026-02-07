@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Camera, RefreshCw, CircleCheck, Loader2 } from "lucide-react";
+import { Camera, RefreshCw, CircleCheck, Loader2, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FaceCaptureProps {
@@ -19,27 +19,28 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
   const [countdown, setCountdown] = useState<number | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          // Trigger autonomous capture sequence
-          setCountdown(3);
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Enable camera permissions to proceed with identity verification.',
-        });
+  const getCameraPermission = useCallback(async () => {
+    try {
+      setHasCameraPermission(null);
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // Trigger rapid autonomous capture sequence
+        setCountdown(1.5);
       }
-    };
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      toast({
+        variant: 'destructive',
+        title: 'BIOMETRIC_SENSOR_OFFLINE',
+        description: 'Identity verification requires active camera permissions.',
+      });
+    }
+  }, [toast]);
 
+  useEffect(() => {
     getCameraPermission();
 
     return () => {
@@ -48,21 +49,24 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [toast]);
+  }, [getCameraPermission]);
 
   useEffect(() => {
     if (countdown === null || isCaptured) return;
 
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      const timer = setTimeout(() => {
+        // Decrement by 0.5 for smoother rapid feel
+        setCountdown(prev => (prev !== null ? prev - 0.5 : null));
+      }, 500);
       return () => clearTimeout(timer);
-    } else if (countdown === 0) {
+    } else if (countdown <= 0) {
       handleCapture();
     }
   }, [countdown, isCaptured]);
 
   const handleCapture = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && !isCaptured) {
       const context = canvasRef.current.getContext('2d');
       if (context) {
         canvasRef.current.width = videoRef.current.videoWidth;
@@ -77,7 +81,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
 
   const handleReset = () => {
     setIsCaptured(false);
-    setCountdown(3);
+    setCountdown(1.5);
   };
 
   return (
@@ -88,49 +92,61 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
           className={`w-full h-full object-cover ${isCaptured ? 'hidden' : 'block'}`} 
           autoPlay 
           muted 
+          playsInline
         />
         <canvas ref={canvasRef} className={`w-full h-full object-cover ${isCaptured ? 'block' : 'hidden'}`} />
         
         {!isCaptured && hasCameraPermission && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-48 h-64 border-2 border-primary/50 rounded-[50%] animate-pulse" />
+            <div className="w-48 h-64 border-2 border-primary/50 rounded-[50%] animate-pulse shadow-[0_0_20px_rgba(0,255,255,0.2)]" />
             {countdown !== null && countdown > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <span className="text-6xl font-bold text-primary glow-cyan">{countdown}</span>
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
+                <div className="text-4xl font-bold text-primary glow-cyan animate-pulse">SCANNING...</div>
               </div>
             )}
           </div>
         )}
         
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-           <span className="text-[10px] bg-black/60 px-2 py-1 text-primary font-mono tracking-widest uppercase">
-             {isCaptured ? "IDENT_LOCKED" : countdown !== null ? "AUTO_SCANNING..." : label}
+           <span className="text-[10px] bg-black/60 px-3 py-1 text-primary font-mono tracking-widest uppercase border border-primary/20">
+             {isCaptured ? "VISAGE_LOCKED" : countdown !== null ? "ESTABLISHING_LINK..." : label}
            </span>
         </div>
       </div>
 
       {!hasCameraPermission && hasCameraPermission !== null && (
-        <Alert variant="destructive">
-          <AlertTitle>Camera Required</AlertTitle>
-          <AlertDescription>
-            Identity link requires visual biometric confirmation.
-          </AlertDescription>
-        </Alert>
+        <div className="w-full space-y-4 animate-in fade-in slide-in-from-top-2">
+          <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle className="text-[10px] font-bold tracking-widest uppercase">SENSOR_ACCESS_DENIED</AlertTitle>
+            <AlertDescription className="text-[9px] uppercase opacity-70">
+              Biometric verification is mandatory for Oracle entry. Please enable camera access.
+            </AlertDescription>
+          </Alert>
+          <Button 
+            variant="outline" 
+            onClick={getCameraPermission}
+            className="w-full text-[10px] font-bold uppercase tracking-[0.2em] border-primary/40 text-primary h-11 hover:bg-primary/10"
+          >
+            <Camera className="w-3.5 h-3.5 mr-2" />
+            ENABLE_BIOMETRIC_SENSOR
+          </Button>
+        </div>
       )}
 
       {isCaptured && (
-        <div className="flex flex-col items-center space-y-4 w-full">
-          <div className="flex items-center space-x-2 text-green-500 animate-in fade-in">
+        <div className="flex flex-col items-center space-y-4 w-full animate-in zoom-in-95 duration-500">
+          <div className="flex items-center space-x-2 text-green-500">
             <CircleCheck className="w-4 h-4" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Biometric_Established</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">IDENTITY_VERIFIED</span>
           </div>
           <Button 
-            variant="outline" 
+            variant="ghost" 
             onClick={handleReset}
-            className="text-[10px] border-primary/30 text-primary h-8"
+            className="text-[9px] text-primary/60 hover:text-primary uppercase h-8"
           >
             <RefreshCw className="w-3 h-3 mr-2" />
-            RETAKE_SCAN
+            RE-CALIBRATE_SCAN
           </Button>
         </div>
       )}
@@ -138,7 +154,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
       {!isCaptured && countdown !== null && countdown > 0 && (
         <div className="flex items-center space-x-2 text-primary/60 animate-pulse">
           <Loader2 className="w-3 h-3 animate-spin" />
-          <span className="text-[9px] uppercase tracking-widest">Awaiting stability...</span>
+          <span className="text-[9px] uppercase tracking-widest">Processing biometrics...</span>
         </div>
       )}
     </div>

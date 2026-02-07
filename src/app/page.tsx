@@ -68,6 +68,19 @@ function RavenOracleApp() {
   }, [db, user]);
   const { data: adminData } = useDoc(adminDocRef);
 
+  // Strict Identity Validation: If session callsign doesn't match registry, reset.
+  useEffect(() => {
+    if (isHydrated && userData && sessionData && userData.callsign !== sessionData.callsign) {
+      console.warn("Identity Mismatch: Purging session.");
+      handleSessionEnd();
+      toast({ 
+        variant: "destructive", 
+        title: "IDENTITY_PURGE", 
+        description: "Your session callsign is no longer valid. Re-authentication required." 
+      });
+    }
+  }, [userData, sessionData, isHydrated, toast]);
+
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
   // Real-time admin notifications
@@ -103,10 +116,7 @@ function RavenOracleApp() {
   // Security: Block logic
   useEffect(() => {
     if (userData?.isBlocked && phase !== "gateway") {
-      setPhase("gateway");
-      setSessionData(null);
-      setIsAdminEntry(false);
-      localStorage.removeItem("raven_oracle_active_session");
+      handleSessionEnd();
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 

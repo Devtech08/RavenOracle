@@ -7,12 +7,12 @@ import { getFirestore } from 'firebase/firestore'
 
 /**
  * Initializes Firebase with a focus on stability across both Client and Server environments.
- * Hardened to prevent the 'app/no-options' error by always utilizing the config object.
  */
 export function initializeFirebase() {
   const apps = getApps();
   if (apps.length > 0) {
-    return getSdks(apps[0]);
+    const app = apps[0];
+    return getSdks(app);
   }
 
   let firebaseApp: FirebaseApp;
@@ -23,6 +23,7 @@ export function initializeFirebase() {
     try {
       firebaseApp = getApp();
     } catch {
+      // Final fallback to prevent initialization errors
       firebaseApp = initializeApp(firebaseConfig);
     }
   }

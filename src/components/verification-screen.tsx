@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, Key, User, Camera, Loader2, CircleCheck, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking, useCollection } from "@/firebase";
 import { doc, collection, query, where, getDocs } from "firebase/firestore";
 import { FaceCapture } from "@/components/face-capture";
 
@@ -32,8 +31,17 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   const searchParams = useSearchParams();
 
   const inviteKey = searchParams.get("invite");
-  const isWarrior = callsign.trim().toUpperCase() === "WARRIOR";
-  const isBypass = isAdminMode || isWarrior;
+  const isWarriorCallsign = callsign.trim().toUpperCase() === "WARRIOR";
+  
+  // Check if admin already exists
+  const adminsQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return collection(db, "roles_admin");
+  }, [db]);
+  const { data: admins } = useCollection(adminsQuery);
+  const adminExists = admins && admins.length > 0;
+
+  const isFirstAdminRegistration = isAdminMode && isWarriorCallsign && !adminExists;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -53,12 +61,31 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCallsign = callsign.trim().toUpperCase();
-    if (!cleanCallsign || !user) return;
+    if (!cleanCallsign || !user || !db) return;
     
     setIsLoading(true);
-    if (isBypass) {
-      // Admins bypass the multi-stage queue
-      onVerify(cleanCallsign, isAdminMode ? "ADMIN_BYPASS" : "WARRIOR_ENTRY");
+
+    // Strict identity check: Access denied if not registered (except first admin)
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDocs(query(collection(db, "users"), where("callsign", "==", cleanCallsign)));
+    const isRegistered = !userSnap.empty;
+
+    if (isFirstAdminRegistration) {
+      // First admin registration requires biometric linkage
+      setStep("biometric");
+      setIsLoading(false);
+      return;
+    }
+
+    if (isAdminMode && isWarriorCallsign && adminExists) {
+      // Existing admin bypass queue but STILL might need session check
+      onVerify(cleanCallsign, "WARRIOR_ENTRY");
+      return;
+    }
+
+    if (!isRegistered && !inviteKey) {
+      toast({ variant: "destructive", title: "IDENTITY_DENIED", description: "Callsign not found in registry. Invite required." });
+      setIsLoading(false);
       return;
     }
 
@@ -77,17 +104,21 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     setIsLoading(false);
   };
 
-  const handleRegistrationComplete = () => {
+  const handleBiometricComplete = () => {
     if (!faceData || !user) return;
     setIsLoading(true);
     
-    // Link current visage to the session record
+    // Link visage to session
     setDocumentNonBlocking(doc(db, "users", user.uid), {
       faceData: faceData,
       lastSessionStart: new Date().toISOString()
     }, { merge: true });
 
-    setStep("final_verification");
+    if (isFirstAdminRegistration) {
+      onVerify("WARRIOR", "INITIAL_REGISTRY");
+    } else {
+      setStep("final_verification");
+    }
     setIsLoading(false);
   };
 
@@ -96,7 +127,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     if (code.trim() === requestData?.sessionCode) {
       onVerify(callsign.toUpperCase(), code);
     } else {
-      toast({ variant: "destructive", title: "INVALID_SESSION_CODE", description: "The provided unlock code mismatch detected." });
+      toast({ variant: "destructive", title: "INVALID_CODE", description: "Unlock code mismatch detected." });
     }
   };
 
@@ -104,7 +135,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     <div className="w-full max-w-sm p-8 bg-card/95 border border-primary/20 rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.8)] animate-slide-up space-y-6 backdrop-blur-md">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary/50 rounded-full mb-2 border border-primary/10">
-          {isBypass ? (
+          {isAdminMode ? (
             <ShieldCheck className="w-8 h-8 text-primary glow-cyan" />
           ) : step === "biometric" ? (
             <Camera className="w-8 h-8 text-primary glow-cyan" />
@@ -115,13 +146,13 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           )}
         </div>
         <h2 className="text-lg font-bold text-primary uppercase tracking-widest">
-          {isBypass ? "Command ID" : step === "callsign" ? "Identity Registry" : step === "wait_approval" ? "Approval Queue" : step === "biometric" ? "Biometric Link" : "Access Key"}
+          {isAdminMode ? "Command Registry" : step === "callsign" ? "Identity Registry" : step === "wait_approval" ? "Approval Queue" : step === "biometric" ? "Biometric Link" : "Access Key"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest leading-relaxed">
-          {isBypass ? "Verified bypass active. State command callsign." : 
+          {isAdminMode ? "Verified bypass active. First-time registration requires visage scan." : 
            step === "callsign" ? "State your callsign for the Oracle's ledger." : 
            step === "wait_approval" ? "Awaiting manual authorization from WARRIOR." : 
-           step === "biometric" ? "Approval confirmed. Link visage to active session." : 
+           step === "biometric" ? "Link visage to active session." : 
            "Identity linked. Enter the session unlock code."}
         </p>
       </div>
@@ -145,7 +176,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               disabled={isLoading || !callsign}
               className="w-full h-11 font-bold uppercase tracking-widest bg-primary text-primary-foreground text-[10px]"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isBypass ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isAdminMode ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
             </Button>
           </form>
         )}
@@ -153,9 +184,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         {step === "wait_approval" && (
           <div className="flex flex-col items-center justify-center p-8 space-y-4 border border-dashed border-primary/20 rounded bg-secondary/10">
             <div className="text-center space-y-2">
-              <p className="text-[10px] font-bold text-primary animate-pulse tracking-widest">TRANSMITTING_TO_ORACLE...</p>
-              <p className="text-[8px] opacity-40 font-mono tracking-tighter">REQ_ID: {requestId}</p>
-              <p className="text-[9px] text-muted-foreground italic">Contact Administrator for clearing.</p>
+              <p className="text-[10px] font-bold text-primary animate-pulse tracking-widest uppercase">Transmitting...</p>
+              <p className="text-[8px] opacity-40 font-mono">REQ_ID: {requestId}</p>
             </div>
           </div>
         )}
@@ -164,7 +194,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           <div className="space-y-4">
             <FaceCapture onCapture={setFaceData} label="SESSION_LINK_SCAN" />
             <Button 
-              onClick={handleRegistrationComplete}
+              onClick={handleBiometricComplete}
               disabled={isLoading || !faceData}
               className="w-full h-11 font-bold uppercase tracking-widest bg-primary text-primary-foreground text-[10px]"
             >
@@ -177,7 +207,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           <div className="space-y-6">
             <div className="p-4 bg-primary/5 border border-primary/20 rounded flex flex-col items-center text-center">
                <CircleCheck className="w-6 h-6 text-primary mb-2 glow-cyan" />
-               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Visage Verified</p>
+               <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Visage Linked</p>
             </div>
             
             <form onSubmit={handleFinalVerify} className="space-y-4">
@@ -202,8 +232,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
       <div className="pt-4 flex items-start space-x-3 text-[9px] text-muted-foreground border-t border-primary/10">
         <ShieldAlert className="w-3 h-3 text-primary shrink-0 opacity-50" />
-        <p className="uppercase tracking-tighter opacity-60">
-          All sessions require manual Warrior authorization and fresh biometric linkage to ensure identity integrity.
+        <p className="uppercase tracking-tighter opacity-60 leading-tight">
+          All sessions require manual Warrior authorization and fresh biometric linkage.
         </p>
       </div>
     </div>

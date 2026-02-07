@@ -83,7 +83,7 @@ function RavenOracleApp() {
       if (currentCount > 0 && currentCount > lastPendingCount.current) {
         toast({
           title: "PENDING_AUTHORIZATION",
-          description: `There are ${currentCount} operative(s) awaiting your clearance in the queue.`,
+          description: `There are ${currentCount} operative(s) awaiting your clearance.`,
           action: (
             <Button 
               variant="outline" 
@@ -110,7 +110,7 @@ function RavenOracleApp() {
       toast({ 
         variant: "destructive", 
         title: "ACCESS_TERMINATED", 
-        description: "Your identification has been purged from the active session by an administrator." 
+        description: "Your identification has been purged from the active session." 
       });
     }
   }, [userData, phase, toast]);

@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Camera, RefreshCw, CircleCheck } from "lucide-react";
+import { Camera, RefreshCw, CircleCheck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface FaceCaptureProps {
@@ -17,6 +16,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [isCaptured, setIsCaptured] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -26,6 +26,8 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         setHasCameraPermission(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Start autonomous capture sequence
+          setCountdown(3);
         }
       } catch (error) {
         console.error('Error accessing camera:', error);
@@ -33,7 +35,7 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         toast({
           variant: 'destructive',
           title: 'Camera Access Denied',
-          description: 'Enable camera permissions to proceed with identity verification.',
+          description: 'Enable camera permissions to proceed.',
         });
       }
     };
@@ -47,6 +49,17 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
       }
     };
   }, [toast]);
+
+  useEffect(() => {
+    if (countdown === null || isCaptured) return;
+
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      handleCapture();
+    }
+  }, [countdown, isCaptured]);
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -62,8 +75,13 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
     }
   };
 
+  const handleReset = () => {
+    setIsCaptured(false);
+    setCountdown(3);
+  };
+
   return (
-    <div className="space-y-4 flex flex-col items-center">
+    <div className="space-y-4 flex flex-col items-center w-full">
       <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-primary/30 group">
         <video 
           ref={videoRef} 
@@ -74,51 +92,53 @@ export function FaceCapture({ onCapture, label = "BIOMETRIC_SCAN" }: FaceCapture
         <canvas ref={canvasRef} className={`w-full h-full object-cover ${isCaptured ? 'block' : 'hidden'}`} />
         
         {!isCaptured && hasCameraPermission && (
-          <div className="absolute inset-0 border-2 border-primary/20 pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-64 border-2 border-primary/50 rounded-[50%] animate-pulse" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-64 border-2 border-primary/50 rounded-[50%] animate-pulse" />
+            {countdown !== null && countdown > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                <span className="text-6xl font-bold text-primary glow-cyan">{countdown}</span>
+              </div>
+            )}
           </div>
         )}
         
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-           <span className="text-[10px] bg-black/60 px-2 py-1 text-primary font-mono tracking-widest">{label}</span>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+           <span className="text-[10px] bg-black/60 px-2 py-1 text-primary font-mono tracking-widest uppercase">
+             {isCaptured ? "IDENT_LOCKED" : countdown !== null ? "AUTO_SCANNING..." : label}
+           </span>
         </div>
       </div>
 
       {!hasCameraPermission && hasCameraPermission !== null && (
         <Alert variant="destructive">
-          <AlertTitle>Camera Access Required</AlertTitle>
+          <AlertTitle>Camera Required</AlertTitle>
           <AlertDescription>
-            Identity verification requires visual confirmation. Please allow access.
+            Identity link requires visual confirmation.
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="flex space-x-2">
-        {!isCaptured ? (
-          <Button 
-            onClick={handleCapture} 
-            disabled={!hasCameraPermission}
-            className="bg-primary text-primary-foreground text-xs font-bold"
-          >
-            <Camera className="w-4 h-4 mr-2" />
-            CAPTURE_IDENTITY
-          </Button>
-        ) : (
+      {isCaptured && (
+        <div className="flex flex-col items-center space-y-4 w-full">
+          <div className="flex items-center space-x-2 text-green-500 animate-in fade-in">
+            <CircleCheck className="w-4 h-4" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Biometric_Established</span>
+          </div>
           <Button 
             variant="outline" 
-            onClick={() => setIsCaptured(false)}
-            className="text-xs border-primary/30 text-primary"
+            onClick={handleReset}
+            className="text-[10px] border-primary/30 text-primary h-8"
           >
             <RefreshCw className="w-3 h-3 mr-2" />
             RETAKE_SCAN
           </Button>
-        )}
-      </div>
-      
-      {isCaptured && (
-        <div className="flex items-center space-x-2 text-green-500 animate-in fade-in">
-          <CircleCheck className="w-4 h-4" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Biometric_Locked</span>
+        </div>
+      )}
+
+      {!isCaptured && countdown !== null && countdown > 0 && (
+        <div className="flex items-center space-x-2 text-primary/60 animate-pulse">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span className="text-[9px] uppercase tracking-widest">Awaiting stability...</span>
         </div>
       )}
     </div>

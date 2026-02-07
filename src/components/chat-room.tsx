@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp } from "firebase/firestore";
+import { collection, doc, query, orderBy, serverTimestamp, where, Timestamp, getDocs } from "firebase/firestore";
 
 interface ChatRoomProps {
   callsign: string;
@@ -101,7 +101,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit for Firestore document
+      if (file.size > 1024 * 1024) {
         toast({ variant: "destructive", title: "FILE_TOO_LARGE", description: "Secure transmissions are limited to 1MB." });
         return;
       }
@@ -143,35 +143,29 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     setInput("");
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-
-    if (target !== "ALL") {
-      toast({ description: `Transmitting to ${target}...` });
-    }
   };
 
-  const handleRequestCallsign = () => {
+  const handleRequestCallsign = async () => {
     if (!newCallsign.trim() || !user || !db) return;
     setIsRequesting(true);
     
     const cleanNewCallsign = newCallsign.trim().toUpperCase();
 
     if (isAdmin) {
-      // WARRIOR level authorization: Bypass review process
+      // WARRIOR autonomy: Instant shift
       updateDocumentNonBlocking(doc(db, "users", user.uid), {
         callsign: cleanNewCallsign
       });
-      
-      // Update admin role registry if it exists for this user
       updateDocumentNonBlocking(doc(db, "roles_admin", user.uid), {
         callsign: cleanNewCallsign
       });
 
       toast({ 
-        title: "IDENTITY_SHIFT_AUTHORIZED", 
+        title: "IDENTITY_SHIFTED", 
         description: `Active callsign successfully shifted to ${cleanNewCallsign}.` 
       });
     } else {
-      // Operative level: Requires explicit WARRIOR review
+      // Operative level: Requires explicit review
       const requestId = Math.random().toString(36).substring(7);
       addDocumentNonBlocking(collection(db, "callsignRequests"), {
         id: requestId,
@@ -184,7 +178,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
       
       toast({ 
         title: "REQUEST_TRANSMITTED", 
-        description: "Identity shift requested. Awaiting WARRIOR authorization." 
+        description: "Identity shift requested. Awaiting clearance." 
       });
     }
     
@@ -203,7 +197,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             <h1 className="text-sm font-bold tracking-widest uppercase text-primary">Raven Oracle</h1>
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <span>Identity: {currentCallsign}</span>
+              <span>ID: {currentCallsign}</span>
             </div>
           </div>
         </div>
@@ -219,7 +213,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             <DialogContent className="bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-primary text-sm uppercase tracking-widest">
-                  {isAdmin ? "DIRECT_IDENTITY_SHIFT" : "IDENTITY_REQUEST"}
+                  {isAdmin ? "DIRECT_SHIFT" : "IDENTITY_REQUEST"}
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -232,7 +226,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               </div>
               <DialogFooter>
                 <Button onClick={handleRequestCallsign} disabled={isRequesting || !newCallsign} className="bg-primary text-primary-foreground text-xs w-full font-bold h-12">
-                  {isAdmin ? "APPLY_IMMEDIATELY" : "SUBMIT_FOR_CLEARANCE"}
+                  {isAdmin ? "APPLY_CHANGES" : "SUBMIT_FOR_CLEARANCE"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -244,7 +238,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
                 variant="outline" 
                 size="sm" 
                 onClick={onOpenAdmin} 
-                className="text-[10px] border-primary/50 text-primary font-bold tracking-widest px-4 h-8 transition-all hover:bg-primary/10 hover:shadow-[0_0_10px_rgba(0,255,255,0.2)]"
+                className="text-[10px] border-primary/50 text-primary font-bold tracking-widest px-4 h-8 transition-all hover:bg-primary/10"
               >
                 <Settings className="w-3.5 h-3.5 mr-2 text-primary" />
                 ADMIN
@@ -266,10 +260,6 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
       <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
         <div className="space-y-6 pb-4">
-          <div className="flex flex-col items-center py-8 opacity-20">
-             <p className="text-[10px] uppercase tracking-[0.5em]">Session Active</p>
-          </div>
-
           {displayMessages.map((msg) => (
             <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'} animate-slide-up`}>
               <div className="flex items-center space-x-2 mb-1 px-1">
@@ -305,12 +295,6 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               </div>
             </div>
           ))}
-          {displayMessages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-64 opacity-20">
-              <History className="w-12 h-12 mb-4" />
-              <p className="text-[10px] uppercase tracking-widest text-center">History Purged Automatically</p>
-            </div>
-          )}
         </div>
       </ScrollArea>
 
@@ -331,7 +315,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             {selectedFile && (
               <div className="flex items-center space-x-2 bg-primary/10 border border-primary/20 px-2 py-1 rounded">
                 <span className="text-[9px] font-mono text-primary truncate max-w-[120px]">{selectedFile.name}</span>
-                <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent" onClick={() => setSelectedFile(null)}>
+                <Button variant="ghost" size="icon" className="h-4 w-4 p-0" onClick={() => setSelectedFile(null)}>
                   <X className="w-3 h-3 text-primary" />
                 </Button>
               </div>
@@ -360,7 +344,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               placeholder="Communicate..."
               className="flex-1 bg-background/50 border-border h-10 font-mono text-sm"
             />
-            <Button type="submit" size="icon" disabled={!input.trim() && !selectedFile} className="bg-primary text-primary-foreground h-10 w-10 shadow-[0_0_10px_rgba(0,255,255,0.2)]">
+            <Button type="submit" size="icon" disabled={!input.trim() && !selectedFile} className="bg-primary text-primary-foreground h-10 w-10">
               <Send className="w-4 h-4" />
             </Button>
           </div>

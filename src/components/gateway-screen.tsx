@@ -45,7 +45,10 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
-      <div className="mb-8 flex flex-col items-center justify-center group">
+      <div className="mb-4 flex flex-col items-center justify-center group">
+        <h1 className="text-4xl sm:text-6xl font-black text-primary glow-cyan tracking-[0.2em] uppercase mb-8 flicker">
+          RAVEN ORACLE
+        </h1>
         
         {/* Isolated Identity Emblem */}
         <div className="mb-6 relative w-56 h-56 flex flex-col items-center justify-center bg-transparent overflow-hidden">
@@ -64,9 +67,6 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
                  </div>
                  <div className="space-y-1">
                    <span className="text-[10px] text-primary font-bold uppercase tracking-widest block">Identity_Link_Pending</span>
-                   <span className="text-[8px] text-primary/40 uppercase tracking-[0.1em] block">
-                     Upload logo.jpeg to<br/>root public/ directory
-                   </span>
                  </div>
                </div>
             </div>
@@ -91,7 +91,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
         </div>
         
         <p className="text-muted-foreground text-sm leading-relaxed mb-8 opacity-80">
-          The shadows await. State the sequence to proceed.
+          State the sequence to proceed.
         </p>
 
         <form onSubmit={handleSubmit} className="relative">
@@ -118,10 +118,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
       <div className="mt-12 flex flex-col items-center space-y-2">
         <p className="text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
-          Requires Oracle Authentication Sequence
-        </p>
-        <p className="text-primary text-[10px] tracking-[0.5em] uppercase opacity-20 font-bold animate-pulse">
-          warrior
+          Requires Oracle Authentication
         </p>
       </div>
     </div>

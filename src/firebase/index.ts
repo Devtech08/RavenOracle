@@ -7,7 +7,6 @@ import { getFirestore } from 'firebase/firestore'
 
 /**
  * Initializes Firebase with a focus on stability across both Client and Server environments.
- * Prevents "app/no-options" errors by defaulting to the provided config.
  */
 export function initializeFirebase() {
   const apps = getApps();
@@ -17,10 +16,9 @@ export function initializeFirebase() {
 
   let firebaseApp: FirebaseApp;
   try {
-    // Attempt to use the provided config directly for maximum reliability
+    // Explicitly provide config to prevent app/no-options error during SSR/Hydration
     firebaseApp = initializeApp(firebaseConfig);
   } catch (e) {
-    // Fallback if already initialized (concurrency safety)
     firebaseApp = getApp();
   }
 

@@ -20,7 +20,7 @@ type VerificationStep = "callsign" | "biometric" | "wait_approval" | "final_veri
 
 function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps) {
   const [step, setStep] = useState<VerificationStep>("callsign");
-  const [callsign, setCallsign] = useState(isAdminMode ? "WARRIOR" : "");
+  const [callsign, setCallsign] = useState("");
   const [faceData, setFaceData] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -54,8 +54,9 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     setIsLoading(true);
     try {
       if (isAdminMode) {
-        // Admin Bypass Logic: Straight to verification
-        onVerify("WARRIOR", "ADMIN_BYPASS");
+        // Even the admin must state their callsign.
+        // If the sequence was raven.admin, we proceed with the stated callsign as a bypass.
+        onVerify(callsign.toUpperCase(), "ADMIN_BYPASS");
         return;
       }
 
@@ -141,7 +142,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   };
 
   return (
-    <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
+    <div className="w-full max-sm p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
           {isAdminMode ? (
@@ -156,7 +157,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           {isAdminMode ? "Admin Identification" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
-          {isAdminMode ? "Verified bypass detected. Identify as WARRIOR." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
+          {isAdminMode ? "Verified bypass detected. Please state your command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
         </p>
       </div>
 
@@ -168,7 +169,6 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               type="text"
               placeholder="CALLSIGN"
               value={callsign}
-              readOnly={isAdminMode}
               onChange={(e) => setCallsign(e.target.value.toUpperCase())}
               className="pl-10 bg-secondary/50 border-border text-center tracking-widest uppercase"
               autoFocus

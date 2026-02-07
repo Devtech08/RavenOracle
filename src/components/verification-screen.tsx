@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
-import { collection, query, where, getDocs, doc } from "firebase/firestore";
+import { collection, doc, getDoc } from "firebase/firestore";
 import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
@@ -47,16 +47,22 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
     
     setIsLoading(true);
     try {
-      const userSnap = await getDocs(query(collection(db, "users"), where("id", "==", user.uid)));
+      // Fix: Use getDoc on a DocumentReference instead of a collection query to comply with security rules
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
       
-      if (userSnap.empty) {
+      if (!userSnap.exists()) {
         setStep("biometric");
       } else {
-        const u = userSnap.docs[0].data();
+        const u = userSnap.data();
         setCallsign(u.callsign);
         setStep("wait_approval");
         createSessionRequest(u.callsign);
       }
+    } catch (err) {
+      console.error("Verification check failed", err);
+      // Fallback to registration flow if check fails
+      setStep("biometric");
     } finally {
       setIsLoading(false);
     }

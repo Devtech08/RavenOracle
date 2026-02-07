@@ -17,6 +17,7 @@ function RavenOracleApp() {
   const db = useFirestore();
   const auth = useAuth();
 
+  // Ensure user is signed in anonymously at the root level to provide auth context for gateway/verification
   useEffect(() => {
     if (!isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
@@ -41,6 +42,7 @@ function RavenOracleApp() {
       const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
+      // Update core user record
       setDocumentNonBlocking(doc(db, "users", user.uid), {
         id: user.uid,
         callsign: finalCallsign,
@@ -50,7 +52,8 @@ function RavenOracleApp() {
       }, { merge: true });
 
       if (isSystemAdmin) {
-        setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true }, { merge: true });
+        // Bootstrap admin role explicitly in Firestore to satisfy security rules for listing data
+        setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
         setSessionData({ callsign: finalCallsign, key });
         // Admins go straight to the admin portal
         setPhase("admin");

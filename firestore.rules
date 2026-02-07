@@ -3,6 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // System identifier for rule deployment: v1.2.1
     function isSignedIn() {
       return request.auth != null;
     }
@@ -24,6 +25,7 @@ service cloud.firestore {
     }
 
     match /gateway/{gatewayId} {
+      // Gateway must be publicly readable for the initial terminal challenge
       allow get: if true;
       allow list, write: if isAdmin();
     }

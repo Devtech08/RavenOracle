@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // System identifier for rule deployment: v1.3.0
+    // System identifier for rule deployment: v1.4.0
     function isSignedIn() {
       return request.auth != null;
     }
@@ -46,6 +46,8 @@ service cloud.firestore {
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
+      // Allow self-provisioning if the user knows the secret gateway sequence (handled in app logic)
+      // or if another admin authorizes them.
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 

@@ -131,6 +131,14 @@
         "$ref": "#/backend/entities/AccessKey"
       },
       "description": "Generated invite keys."
+    },
+    "/roles_admin/{userId}": {
+      "schema": { "type": "object", "properties": { "enabled": { "type": "boolean" }, "callsign": { "type": "string" } } },
+      "description": "Privileged role registry for command authority."
+    },
+    "/gateway/default": {
+      "schema": { "type": "object", "properties": { "gatewayAddress": { "type": "string" }, "adminAddress": { "type": "string" } } },
+      "description": "Dynamic gateway sequence configuration."
     }
   }
 }

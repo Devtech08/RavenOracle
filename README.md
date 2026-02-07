@@ -14,7 +14,8 @@ A high-security, futuristic communication platform designed for discrete operati
 
 ## 🎨 Branding
 To update the main gateway emblem:
-- Upload your logo file to the root `public/` directory.
+- Ensure there is a folder named `public` at the **root of your project** (outside the `src` folder).
+- Upload your logo file to that root `public/` directory.
 - Ensure the filename is exactly `logo.jpeg`.
 
 ## 🔑 Access Control & Identity

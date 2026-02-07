@@ -32,7 +32,8 @@ import {
   UserRound,
   LayoutDashboard,
   Copy,
-  Plus
+  Plus,
+  RotateCcw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase";
@@ -148,13 +149,16 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
     toast({ title: "SESSION_AUTHORIZED" });
   };
 
-  const handleAction = (userId: string, action: 'block' | 'delete') => {
+  const handleAction = (userId: string, action: 'block' | 'unblock' | 'delete') => {
     if (action === 'delete') {
       deleteDocumentNonBlocking(doc(db, "users", userId));
       toast({ title: "USER_PURGED" });
-    } else {
+    } else if (action === 'block') {
       updateDocumentNonBlocking(doc(db, "users", userId), { isBlocked: true });
       toast({ title: "USER_TERMINATED" });
+    } else if (action === 'unblock') {
+      updateDocumentNonBlocking(doc(db, "users", userId), { isBlocked: false });
+      toast({ title: "USER_RESTORED" });
     }
   };
 
@@ -252,7 +256,7 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                     <TableHead className="text-primary uppercase text-[10px]">Callsign</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Biometrics</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
-                    <TableHead className="text-primary uppercase text-[10px] text-right">Actions</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px] text-right">Admin_Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -272,12 +276,35 @@ export function AdminPanel({ onClose, onReturnToChat, isRegistryAdmin }: AdminPa
                       </TableCell>
                       <TableCell className="text-right space-x-2">
                         {!u.isAdmin && !u.isBlocked && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleAction(u.id, 'block')}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Terminate Operative"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10" 
+                            onClick={() => handleAction(u.id, 'block')}
+                          >
                             <Ban className="w-4 h-4" />
                           </Button>
                         )}
+                        {!u.isAdmin && u.isBlocked && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Restore Operative"
+                            className="h-8 w-8 text-green-500 hover:bg-green-500/10" 
+                            onClick={() => handleAction(u.id, 'unblock')}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                        )}
                         {!u.isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 opacity-50" onClick={() => handleAction(u.id, 'delete')}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Purge From Registry"
+                            className="h-8 w-8 opacity-50 hover:opacity-100 hover:text-destructive hover:bg-destructive/10" 
+                            onClick={() => handleAction(u.id, 'delete')}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}

@@ -9,6 +9,7 @@ import { AdminPanel } from "@/components/admin-panel";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
 import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn, setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
@@ -17,6 +18,7 @@ function RavenOracleApp() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const auth = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -24,14 +26,33 @@ function RavenOracleApp() {
     }
   }, [user, isUserLoading, auth]);
 
+  const userDocRef = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return doc(db, "users", user.uid);
+  }, [db, user]);
+  const { data: userData } = useDoc(userDocRef);
+
   const adminDocRef = useMemoFirebase(() => {
     if (!db || !user) return null;
     return doc(db, "roles_admin", user.uid);
   }, [db, user]);
-  
   const { data: adminData } = useDoc(adminDocRef);
+
+  // Enforce Termination: If a user is blocked, force them out
+  useEffect(() => {
+    if (userData?.isBlocked && phase !== "gateway") {
+      setPhase("gateway");
+      setSessionData(null);
+      setIsAdminEntry(false);
+      toast({ 
+        variant: "destructive", 
+        title: "ACCESS_TERMINATED", 
+        description: "Your identification has been purged from the active session by an administrator." 
+      });
+    }
+  }, [userData, phase, toast]);
   
-  // Consolidate admin authority: Either they entered via raven.admin OR they have a role in the registry
+  // Consolidate admin authority
   const isUserAdmin = !!adminData || isAdminEntry || (sessionData?.callsign === "WARRIOR");
 
   const handleGatewaySuccess = (isAdminMode: boolean) => {
@@ -56,8 +77,6 @@ function RavenOracleApp() {
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
         setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
         
-        // If they used raven.admin, go straight to Admin Terminal
-        // If they used raven.oracle, they enter as a "normal user" first
         if (isAdminEntry) {
           setPhase("admin");
         } else {

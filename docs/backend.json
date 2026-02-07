@@ -1,0 +1,224 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the Raven Oracle portal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "callsign": {
+          "type": "string",
+          "description": "The user's callsign for identification within the portal."
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "The date and time when the user registered.",
+          "format": "date-time"
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Indicates whether the user has administrator privileges."
+        },
+        "isBlocked": {
+          "type": "boolean",
+          "description": "Indicates whether the user is blocked from accessing the portal."
+        }
+      },
+      "required": [
+        "id",
+        "callsign",
+        "registrationDate",
+        "isAdmin",
+        "isBlocked"
+      ]
+    },
+    "Gateway": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Gateway",
+      "type": "object",
+      "description": "Represents the gateway configuration for accessing the Raven Oracle portal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the gateway configuration."
+        },
+        "gatewayAddress": {
+          "type": "string",
+          "description": "The required gateway address to access the portal (e.g., raven.oracle)."
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "The date and time when the gateway configuration was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "gatewayAddress",
+        "lastUpdated"
+      ]
+    },
+    "AccessKey": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AccessKey",
+      "type": "object",
+      "description": "Represents a secret access key generated for new users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the access key."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:1 AccessKey) The ID of the user this key belongs to."
+        },
+        "accessKey": {
+          "type": "string",
+          "description": "The secret access key generated for the user."
+        },
+        "expirationDate": {
+          "type": "string",
+          "description": "The date and time when the access key expires.",
+          "format": "date-time"
+        },
+        "isUsed": {
+          "type": "boolean",
+          "description": "Indicates whether the access key has been used."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "accessKey",
+        "expirationDate",
+        "isUsed"
+      ]
+    },
+    "MessageLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MessageLog",
+      "type": "object",
+      "description": "Represents a log of messages exchanged within the Raven Oracle portal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the message log entry."
+        },
+        "senderId": {
+          "type": "string",
+          "description": "Reference to User. The ID of the user who sent the message."
+        },
+        "messageContent": {
+          "type": "string",
+          "description": "The content of the message."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The date and time when the message was sent.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "senderId",
+        "messageContent",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Includes 'isAdmin' and 'isBlocked' for authorization.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/gateway/{gatewayId}",
+        "definition": {
+          "entityName": "Gateway",
+          "schema": {
+            "$ref": "#/backend/entities/Gateway"
+          },
+          "description": "Stores the gateway configuration, allowing admins to update the gateway address.",
+          "params": [
+            {
+              "name": "gatewayId",
+              "description": "The unique identifier of the gateway configuration."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/accessKeys/{accessKeyId}",
+        "definition": {
+          "entityName": "AccessKey",
+          "schema": {
+            "$ref": "#/backend/entities/AccessKey"
+          },
+          "description": "Stores access keys generated for new users. Includes 'userId' to link the key to a user, and 'isUsed' flag.",
+          "params": [
+            {
+              "name": "accessKeyId",
+              "description": "The unique identifier of the access key."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/messageLogs/{messageLogId}",
+        "definition": {
+          "entityName": "MessageLog",
+          "schema": {
+            "$ref": "#/backend/entities/MessageLog"
+          },
+          "description": "Stores message logs, accessible to admins for review. Messages auto-purge for non-admins.",
+          "params": [
+            {
+              "name": "messageLogId",
+              "description": "The unique identifier of the message log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection to store admin roles. Existence of a document grants admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the Raven Oracle application, prioritizing security, scalability, and ease of debugging. It strictly adheres to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are Not Filters). Authorization Independence is achieved via denormalization, eliminating the need for `get()` calls in security rules. This design employs structural segregation to enforce a homogeneous security posture within collections and uses consistent access modeling patterns to simplify authorization logic.\n\nSpecifically:\n\n*   **Users:** User data is stored in `/users/{userId}`. The `isAdmin` and `isBlocked` flags are stored directly within the user document. This allows for simple rules based on `request.auth.uid` and the user document's contents, enforcing Authorization Independence.\n*   **Gateway:** Gateway configurations are stored in a dedicated `/gateway/{gatewayId}`. Admin access is controlled via the `/roles_admin/{userId}` collection. This segregation ensures that only admins can modify gateway settings.\n*   **Access Keys:** Access keys are stored in `/accessKeys/{accessKeyId}`. The `userId` is stored within the AccessKey document, linking it to a specific user. The `isUsed` flag indicates whether the key has been used. This allows for secure validation of access keys without needing to perform complex queries or joins.\n*   **Message Logs:** Message logs are stored in `/messageLogs/{messageLogId}`.  The `senderId` is included in each message.  Since all messages auto-purge for non-admins, and only admins can review past messages, storing all logs in a single collection `/messageLogs` simplifies querying and rules. Admins have their role validated via `/roles_admin/{userId}` and can `get()` the message logs. Non-admin users have access restricted by rules and the auto-purge mechanism.\n*   **Admin Roles:** Administrative privileges are managed using the `/roles_admin/{userId}` collection. The existence of a document at this path grants administrative access. This is an Existence-over-Content model, simplifying the security rules.\n\nThis structure facilitates QAPs by:\n\n*   **Segregation:** Separating user data, gateway configurations, access keys, and message logs into distinct collections. This avoids mixing data with different access requirements in the same collection.\n*   **Membership Models:** Using existence checks in the `/roles_admin` collection. The existence of an admin role allows access to restricted functions like viewing all members or modifying gateway settings."
+  }
+}

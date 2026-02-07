@@ -65,6 +65,20 @@
         }
       },
       "required": ["id", "userId", "currentCallsign", "requestedCallsign", "status", "timestamp"]
+    },
+    "MessageLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MessageLog",
+      "type": "object",
+      "description": "A secure log of all communications within the portal.",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string" },
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sender", "userId", "content", "timestamp"]
     }
   },
   "auth": {
@@ -84,6 +98,12 @@
         "$ref": "#/backend/entities/CallsignRequest"
       },
       "description": "Pending callsign change requests for admin approval."
+    },
+    "/messageLogs/{messageId}": {
+      "schema": {
+        "$ref": "#/backend/entities/MessageLog"
+      },
+      "description": "Archived communication logs accessible only to administrators."
     }
   }
 }

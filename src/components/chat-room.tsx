@@ -19,16 +19,17 @@ import {
   Ghost,
   Lock,
   Settings,
-  UserEdit,
-  User
+  User,
+  History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { collection, doc, addDoc, query, orderBy, serverTimestamp } from "firebase/firestore";
 
 interface Message {
   id: string;
   sender: string;
+  userId?: string;
   content: string;
   timestamp: string;
   isMe: boolean;
@@ -43,7 +44,7 @@ interface ChatRoomProps {
 }
 
 export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLogout, onOpenAdmin }: ChatRoomProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [newCallsign, setNewCallsign] = useState("");
   const [isRequesting, setIsRequesting] = useState(false);
@@ -60,17 +61,34 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
   const { data: userData } = useDoc(userDocRef);
   const currentCallsign = userData?.callsign || initialCallsign;
 
+  // Real-time listener for admins to see ALL history
+  const messagesQuery = useMemoFirebase(() => {
+    if (!db || !isAdmin) return null;
+    return query(collection(db, "messageLogs"), orderBy("timestamp", "asc"));
+  }, [db, isAdmin]);
+
+  const { data: historicalMessages } = useCollection(messagesQuery);
+
+  // Determine which messages to show
+  const displayMessages = isAdmin && historicalMessages 
+    ? historicalMessages.map(m => ({
+        ...m,
+        timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString() : new Date(m.timestamp).toLocaleTimeString(),
+        isMe: m.userId === user?.uid
+      }))
+    : sessionMessages;
+
   useEffect(() => {
-    const welcome: Message = {
-      id: "system-1",
-      sender: "ORACLE",
-      content: isAdmin 
-        ? `ADMIN_ACCESS_GRANTED: Welcome back, ${currentCallsign}. All past logs decrypted.`
-        : `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${currentCallsign}. Communication is now secure.`,
-      timestamp: new Date().toLocaleTimeString(),
-      isMe: false,
-    };
-    setMessages([welcome]);
+    if (!isAdmin) {
+      const welcome: Message = {
+        id: "system-1",
+        sender: "ORACLE",
+        content: `ENCRYPTED_CHANNEL_ESTABLISHED: Welcome, ${currentCallsign}. Communication is now secure. Past logs cleared for this session.`,
+        timestamp: new Date().toLocaleTimeString(),
+        isMe: false,
+      };
+      setSessionMessages([welcome]);
+    }
   }, [isAdmin, currentCallsign]);
 
   useEffect(() => {
@@ -80,33 +98,50 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
         behavior: "smooth",
       });
     }
-  }, [messages]);
+  }, [displayMessages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !user) return;
 
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      sender: currentCallsign,
-      content: input,
-      timestamp: new Date().toLocaleTimeString(),
-      isMe: true,
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const messageContent = input.trim();
     setInput("");
 
-    setTimeout(() => {
-      const reply: Message = {
-        id: `reply-${Date.now()}`,
-        sender: "ORACLE",
-        content: `Acknowledged, ${currentCallsign}. Sequence ${Math.random().toString(36).substring(7).toUpperCase()} recorded.`,
-        timestamp: new Date().toLocaleTimeString(),
-        isMe: false,
-      };
-      setMessages((prev) => [...prev, reply]);
-    }, 1500);
+    // 1. Write to Firestore (Permanent log for Admin)
+    try {
+      addDoc(collection(db, "messageLogs"), {
+        sender: currentCallsign,
+        userId: user.uid,
+        content: messageContent,
+        timestamp: serverTimestamp()
+      });
+
+      // 2. Update local state for Non-Admins (Session-only visibility)
+      if (!isAdmin) {
+        const newMessage: Message = {
+          id: `msg-${Date.now()}`,
+          sender: currentCallsign,
+          content: messageContent,
+          timestamp: new Date().toLocaleTimeString(),
+          isMe: true,
+        };
+        setSessionMessages((prev) => [...prev, newMessage]);
+
+        // Simulated Oracle reply for Users
+        setTimeout(() => {
+          const reply: Message = {
+            id: `reply-${Date.now()}`,
+            sender: "ORACLE",
+            content: `Acknowledged, ${currentCallsign}. Data packet encrypted and archived.`,
+            timestamp: new Date().toLocaleTimeString(),
+            isMe: false,
+          };
+          setSessionMessages((prev) => [...prev, reply]);
+        }, 1500);
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "SEND_FAILED" });
+    }
   };
 
   const handleRequestCallsign = async () => {
@@ -115,7 +150,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     
     try {
       const requestId = Math.random().toString(36).substring(7);
-      await setDoc(doc(db, "callsignRequests", requestId), {
+      await addDoc(collection(db, "callsignRequests"), {
         id: requestId,
         userId: user.uid,
         currentCallsign: currentCallsign,
@@ -145,6 +180,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
             <div className="flex items-center space-x-2 text-[10px] text-muted-foreground uppercase">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               <span>Identity: {currentCallsign}</span>
+              {isAdmin && <span className="ml-2 text-primary font-bold">[ARCHIVE_ACCESS: ENABLED]</span>}
             </div>
           </div>
         </div>
@@ -206,7 +242,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
 
       <ScrollArea className="flex-1 p-4" viewportRef={scrollRef}>
         <div className="space-y-6 pb-4">
-          {messages.map((msg) => (
+          {displayMessages.map((msg) => (
             <div 
               key={msg.id} 
               className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'} animate-slide-up`}
@@ -229,6 +265,12 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
               </div>
             </div>
           ))}
+          {isAdmin && historicalMessages?.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full py-20 opacity-20">
+              <History className="w-12 h-12 mb-4" />
+              <p className="text-xs uppercase tracking-widest">No historical logs found</p>
+            </div>
+          )}
         </div>
       </ScrollArea>
 

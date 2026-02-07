@@ -29,7 +29,7 @@ function RavenOracleApp() {
     return doc(db, "roles_admin", user.uid);
   }, [db, user]);
   
-  const { data: adminData, isLoading: isAdminLoading } = useDoc(adminDocRef);
+  const { data: adminData } = useDoc(adminDocRef);
   const isAdmin = !!adminData;
 
   const handleGatewaySuccess = (isAdminMode: boolean) => {
@@ -39,7 +39,7 @@ function RavenOracleApp() {
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
     if (user) {
-      const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
+      const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || key === "WARRIOR_ENTRY" || isAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
       setDocumentNonBlocking(doc(db, "users", user.uid), {
@@ -97,9 +97,9 @@ function RavenOracleApp() {
         />
       )}
 
-      {phase === "admin" && (isAdmin || isAdminEntry) && (
+      {phase === "admin" && (isAdmin || isAdminEntry || sessionData?.callsign === "WARRIOR") && (
         <AdminPanel 
-          isRegistryAdmin={isAdmin}
+          isRegistryAdmin={true}
           onClose={handleSessionEnd} 
         />
       )}

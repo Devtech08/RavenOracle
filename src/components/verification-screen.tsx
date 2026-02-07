@@ -32,7 +32,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
   const isInvited = !!searchParams.get("invite");
   const isWarrior = callsign.trim().toUpperCase() === "WARRIOR";
-  const shouldSkipFacial = !isInvited || isAdminMode || isWarrior;
+  const isBypass = isAdminMode || isWarrior;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -55,7 +55,6 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     
     setIsLoading(true);
     try {
-      // If it's the admin gate OR the callsign is explicitly WARRIOR, treat as admin entry
       if (isAdminMode || cleanCallsign === "WARRIOR") {
         onVerify(cleanCallsign, isAdminMode ? "ADMIN_BYPASS" : "WARRIOR_ENTRY");
         return;
@@ -65,7 +64,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        if (shouldSkipFacial) {
+        if (!isInvited) {
+          // Normal user entering via raven.oracle, no invite
           setDocumentNonBlocking(doc(db, "users", user.uid), {
             id: user.uid,
             callsign: cleanCallsign,
@@ -77,6 +77,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           createSessionRequest(cleanCallsign);
           setStep("wait_approval");
         } else {
+          // Invited user
           setStep("biometric");
         }
       } else {
@@ -87,12 +88,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       }
     } catch (err) {
       console.error("Verification check failed", err);
-      if (shouldSkipFacial) {
-        setStep("wait_approval");
-        createSessionRequest(cleanCallsign);
-      } else {
-        setStep("biometric");
-      }
+      setStep("wait_approval");
+      createSessionRequest(cleanCallsign);
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +143,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     <div className="w-full max-w-lg p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
-          {isAdminMode || isWarrior ? (
+          {isBypass ? (
             <ShieldCheck className="w-8 h-8 text-primary glow-cyan" />
           ) : step === "biometric" ? (
             <Camera className="w-8 h-8 text-primary glow-cyan" />
@@ -155,14 +152,14 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           )}
         </div>
         <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">
-          {isAdminMode || isWarrior ? "Admin Identification" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
+          {isBypass ? "Command ID" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
-          {isAdminMode || isWarrior ? "Verified bypass detected. Please state your command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
+          {isBypass ? "Verified bypass detected. State command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
         </p>
       </div>
 
-      <div className="max-w-sm mx-auto w-full space-y-6">
+      <div className="max-w-xs mx-auto w-full space-y-6">
         {step === "callsign" && (
           <form onSubmit={handleInitialSubmit} className="space-y-4">
             <div className="relative">
@@ -181,7 +178,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               disabled={isLoading || !callsign}
               className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : (isAdminMode || isWarrior) ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : isBypass ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
             </Button>
           </form>
         )}
@@ -194,7 +191,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               disabled={isLoading || !faceData}
               className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : "FINALIZE_BIOMETRICS"}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "FINALIZE_BIOMETRICS"}
             </Button>
           </div>
         )}
@@ -206,7 +203,6 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               <p className="text-xs font-bold text-primary animate-pulse">TRANSMITTING_TO_WARRIOR...</p>
               <p className="text-[10px] opacity-40 mt-2">Request ID: {requestId}</p>
             </div>
-            <p className="text-[9px] text-center text-muted-foreground">Awaiting operative clearance. Do not terminate session.</p>
           </div>
         )}
 
@@ -215,17 +211,16 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
                <CircleCheck className="w-8 h-8 text-green-500 mb-2" />
                <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
-               <p className="text-[10px] opacity-60">Identity validation successful</p>
             </div>
             
-            {!shouldSkipFacial && !faceData && (
+            {isInvited && !faceData && !isBypass && (
                <div className="py-2">
                   <FaceCapture onCapture={handleFaceCapture} label="ACCESS_VALIDATION" />
                </div>
             )}
 
             <form onSubmit={handleFinalVerify} className="space-y-4">
-              {(shouldSkipFacial || faceData) && (
+              {(!isInvited || faceData || isBypass) && (
                 <div className="p-4 bg-secondary/50 rounded border border-primary/20 text-center font-mono text-xl tracking-[0.5em] text-primary animate-in zoom-in-95">
                   {requestData?.sessionCode}
                 </div>
@@ -237,11 +232,11 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
                 onChange={(e) => setCode(e.target.value)}
                 className="bg-secondary/50 border-border text-center tracking-widest h-12"
                 autoFocus
-                disabled={!shouldSkipFacial && !faceData}
+                disabled={isInvited && !faceData && !isBypass}
               />
               <Button 
                 type="submit" 
-                disabled={!shouldSkipFacial && !faceData}
+                disabled={isInvited && !faceData && !isBypass}
                 className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
               >
                 ENTER_PORTAL
@@ -254,9 +249,9 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />
         <p>
-          {isAdminMode || isWarrior
+          {isBypass
             ? "Administrative bypass active. Secure identity tunnel established for command callsign."
-            : "System Warning: Session access requires manual administrator authorization."}
+            : "Session access requires manual administrator authorization."}
         </p>
       </div>
     </div>

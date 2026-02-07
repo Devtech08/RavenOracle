@@ -31,7 +31,8 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
   const searchParams = useSearchParams();
 
   const isInvited = !!searchParams.get("invite");
-  const shouldSkipFacial = !isInvited || isAdminMode;
+  const isWarrior = callsign.trim().toUpperCase() === "WARRIOR";
+  const shouldSkipFacial = !isInvited || isAdminMode || isWarrior;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -49,12 +50,14 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!callsign.trim() || !user) return;
+    const cleanCallsign = callsign.trim().toUpperCase();
+    if (!cleanCallsign || !user) return;
     
     setIsLoading(true);
     try {
-      if (isAdminMode) {
-        onVerify(callsign.toUpperCase(), "ADMIN_BYPASS");
+      // If it's the admin gate OR the callsign is explicitly WARRIOR, treat as admin entry
+      if (isAdminMode || cleanCallsign === "WARRIOR") {
+        onVerify(cleanCallsign, isAdminMode ? "ADMIN_BYPASS" : "WARRIOR_ENTRY");
         return;
       }
 
@@ -65,13 +68,13 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
         if (shouldSkipFacial) {
           setDocumentNonBlocking(doc(db, "users", user.uid), {
             id: user.uid,
-            callsign: callsign.toUpperCase(),
+            callsign: cleanCallsign,
             registrationDate: new Date().toISOString(),
             isAdmin: false,
             isBlocked: false
           }, { merge: false });
           
-          createSessionRequest(callsign);
+          createSessionRequest(cleanCallsign);
           setStep("wait_approval");
         } else {
           setStep("biometric");
@@ -86,7 +89,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       console.error("Verification check failed", err);
       if (shouldSkipFacial) {
         setStep("wait_approval");
-        createSessionRequest(callsign);
+        createSessionRequest(cleanCallsign);
       } else {
         setStep("biometric");
       }
@@ -132,7 +135,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
 
   const handleFinalVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS") {
+    if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS" || code === "WARRIOR_ENTRY") {
       onVerify(callsign.toUpperCase(), code);
     } else {
       toast({ variant: "destructive", title: "INVALID_SESSION_CODE" });
@@ -143,7 +146,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
     <div className="w-full max-w-lg p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
-          {isAdminMode ? (
+          {isAdminMode || isWarrior ? (
             <ShieldCheck className="w-8 h-8 text-primary glow-cyan" />
           ) : step === "biometric" ? (
             <Camera className="w-8 h-8 text-primary glow-cyan" />
@@ -152,10 +155,10 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
           )}
         </div>
         <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">
-          {isAdminMode ? "Admin Identification" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
+          {isAdminMode || isWarrior ? "Admin Identification" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
-          {isAdminMode ? "Verified bypass detected. Please state your command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
+          {isAdminMode || isWarrior ? "Verified bypass detected. Please state your command callsign." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
         </p>
       </div>
 
@@ -178,7 +181,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
               disabled={isLoading || !callsign}
               className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
             >
-              {isLoading ? <Loader2 className="animate-spin" /> : isAdminMode ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
+              {isLoading ? <Loader2 className="animate-spin" /> : (isAdminMode || isWarrior) ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
             </Button>
           </form>
         )}
@@ -251,7 +254,7 @@ function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps)
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />
         <p>
-          {isAdminMode 
+          {isAdminMode || isWarrior
             ? "Administrative bypass active. Secure identity tunnel established for command callsign."
             : "System Warning: Session access requires manual administrator authorization."}
         </p>

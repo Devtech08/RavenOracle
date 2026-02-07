@@ -14,7 +14,8 @@ import {
   X, 
   Ban,
   Check,
-  Zap
+  Zap,
+  Globe
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
@@ -26,6 +27,7 @@ interface AdminPanelProps {
 
 export function AdminPanel({ onClose }: AdminPanelProps) {
   const [newGateway, setNewGateway] = useState("");
+  const [newAdminGateway, setNewAdminGateway] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const { toast } = useToast();
   const db = useFirestore();
@@ -42,14 +44,18 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
-  const handleUpdateGateway = () => {
-    if (!newGateway.trim()) return;
+  const handleUpdateGateway = (type: 'user' | 'admin') => {
+    const value = type === 'user' ? newGateway : newAdminGateway;
+    if (!value.trim()) return;
+    
     setDocumentNonBlocking(gatewayRef, {
-      gatewayAddress: newGateway.trim().toLowerCase(),
+      [type === 'user' ? 'gatewayAddress' : 'adminAddress']: value.trim().toLowerCase(),
       lastUpdated: new Date().toISOString()
     }, { merge: true });
+    
     toast({ title: "GATEWAY_UPDATED" });
-    setNewGateway("");
+    if (type === 'user') setNewGateway("");
+    else setNewAdminGateway("");
   };
 
   const handleGenerateInvite = () => {
@@ -96,7 +102,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         <CardHeader className="border-b border-border bg-secondary/30 flex flex-row items-center justify-between py-4">
           <div className="flex items-center space-x-3">
             <ShieldCheck className="w-6 h-6 text-primary glow-cyan" />
-            <CardTitle className="text-sm font-bold tracking-widest uppercase">Admin Terminal v1.2.0</CardTitle>
+            <CardTitle className="text-sm font-bold tracking-widest uppercase">Command Terminal v1.3.0</CardTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-destructive/20 hover:text-destructive">
             <X className="w-5 h-5" />
@@ -106,20 +112,20 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
         <CardContent className="flex-1 overflow-hidden p-6">
           <Tabs defaultValue="sessions" className="h-full flex flex-col">
             <TabsList className="bg-secondary/50 border border-border w-fit mb-6">
-              <TabsTrigger value="sessions" className="text-[10px]">ACCESS_SESSIONS</TabsTrigger>
-              <TabsTrigger value="members" className="text-[10px]">REGISTRY</TabsTrigger>
-              <TabsTrigger value="requests" className="text-[10px]">ID_UPDATES</TabsTrigger>
-              <TabsTrigger value="system" className="text-[10px]">SYSTEM</TabsTrigger>
+              <TabsTrigger value="sessions" className="text-[10px]">ACCESS_QUEUES</TabsTrigger>
+              <TabsTrigger value="members" className="text-[10px]">OPERATIVE_REGISTRY</TabsTrigger>
+              <TabsTrigger value="requests" className="text-[10px]">IDENTITY_TASKS</TabsTrigger>
+              <TabsTrigger value="system" className="text-[10px]">SYSTEM_CONFIG</TabsTrigger>
             </TabsList>
 
             <TabsContent value="sessions" className="flex-1 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border">
-                    <TableHead className="text-primary uppercase text-[10px]">Subject</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px]">Operative</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Status</TableHead>
                     <TableHead className="text-primary uppercase text-[10px]">Request_ID</TableHead>
-                    <TableHead className="text-primary uppercase text-[10px] text-right">Command</TableHead>
+                    <TableHead className="text-primary uppercase text-[10px] text-right">Clearance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -127,7 +133,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                     <TableRow key={req.id} className="border-border">
                       <TableCell className="font-bold text-xs">{req.callsign}</TableCell>
                       <TableCell>
-                         <Badge className="bg-yellow-500/20 text-yellow-500 text-[8px] border-yellow-500/30">AWAITING_ORACLE</Badge>
+                         <Badge className="bg-yellow-500/20 text-yellow-500 text-[8px] border-yellow-500/30">AWAITING_WARRIOR</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-[10px] opacity-40">{req.id}</TableCell>
                       <TableCell className="text-right space-x-2">
@@ -142,7 +148,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                   ))}
                   {sessionRequests?.filter(r => r.status === 'pending').length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">NO_ACTIVE_SESSION_REQUESTS</TableCell>
+                      <TableCell colSpan={4} className="text-center py-12 opacity-30 text-[10px]">NO_PENDING_ACCESS_REQUESTS</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -164,7 +170,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                     <TableRow key={u.id} className="border-border">
                       <TableCell className="font-bold text-xs">{u.callsign}</TableCell>
                       <TableCell>
-                        {u.faceData ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary">SCAN_LOCKED</Badge> : <Badge variant="destructive" className="text-[8px]">MISSING</Badge>}
+                        {u.faceData ? <Badge variant="outline" className="text-[8px] border-primary/20 text-primary">VISAGE_HASHED</Badge> : <Badge variant="destructive" className="text-[8px]">UNVERIFIED</Badge>}
                       </TableCell>
                       <TableCell>
                         <Badge variant={u.isBlocked ? "destructive" : "outline"} className="text-[8px]">
@@ -225,23 +231,31 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
             <TabsContent value="system" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className="bg-secondary/20 border-border">
-                  <CardHeader>
-                    <CardTitle className="text-xs uppercase text-primary">Gateway Sequence</CardTitle>
+                  <CardHeader className="flex flex-row items-center space-x-2">
+                    <Globe className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-xs uppercase text-primary">Gateway Sequences</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-3 bg-background/50 border border-border rounded font-mono text-primary text-sm">
-                      {gatewayData?.gatewayAddress || "raven.oracle"}
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase opacity-50">Operative Entrance (Oracle)</label>
+                      <div className="flex space-x-2">
+                        <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder={gatewayData?.gatewayAddress || "raven.oracle"} className="font-mono text-xs h-8" />
+                        <Button onClick={() => handleUpdateGateway('user')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                      </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <Input value={newGateway} onChange={(e) => setNewGateway(e.target.value)} placeholder="NEW_SEQUENCE" className="font-mono text-xs h-8" />
-                      <Button onClick={handleUpdateGateway} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase opacity-50">Command Entrance (Admin Bypass)</label>
+                      <div className="flex space-x-2">
+                        <Input value={newAdminGateway} onChange={(e) => setNewAdminGateway(e.target.value)} placeholder={gatewayData?.adminAddress || "raven.admin"} className="font-mono text-xs h-8" />
+                        <Button onClick={() => handleUpdateGateway('admin')} size="sm" className="bg-primary text-primary-foreground text-[10px] h-8">UPDATE</Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="bg-secondary/20 border-border">
                   <CardHeader>
-                    <CardTitle className="text-xs uppercase text-primary">Identity Provisioning</CardTitle>
+                    <CardTitle className="text-xs uppercase text-primary">Operative Provisioning</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Button onClick={handleGenerateInvite} className="w-full bg-primary text-primary-foreground font-bold text-[10px] h-8">PROVISION_NEW_KEY</Button>

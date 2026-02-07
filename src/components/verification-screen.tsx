@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -13,13 +13,14 @@ import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
   onVerify: (callsign: string, key: string) => void;
+  isAdminMode: boolean;
 }
 
 type VerificationStep = "callsign" | "biometric" | "wait_approval" | "final_verification";
 
-function VerificationContent({ onVerify }: VerificationScreenProps) {
+function VerificationContent({ onVerify, isAdminMode }: VerificationScreenProps) {
   const [step, setStep] = useState<VerificationStep>("callsign");
-  const [callsign, setCallsign] = useState("");
+  const [callsign, setCallsign] = useState(isAdminMode ? "WARRIOR" : "");
   const [faceData, setFaceData] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -30,8 +31,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
   const searchParams = useSearchParams();
 
   const isInvited = !!searchParams.get("invite");
-  const isAdminCallsign = callsign.toUpperCase() === "WARRIOR";
-  const shouldSkipFacial = !isInvited || isAdminCallsign;
+  const shouldSkipFacial = !isInvited || isAdminMode;
 
   const requestRef = useMemoFirebase(() => {
     if (!db || !requestId) return null;
@@ -53,18 +53,22 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
     
     setIsLoading(true);
     try {
+      if (isAdminMode) {
+        // Admin Bypass Logic: Straight to verification
+        onVerify("WARRIOR", "ADMIN_BYPASS");
+        return;
+      }
+
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        // First-time registration
         if (shouldSkipFacial) {
-          // Bypassing biometric registration
           setDocumentNonBlocking(doc(db, "users", user.uid), {
             id: user.uid,
             callsign: callsign.toUpperCase(),
             registrationDate: new Date().toISOString(),
-            isAdmin: isAdminCallsign,
+            isAdmin: false,
             isBlocked: false
           }, { merge: false });
           
@@ -105,7 +109,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
       callsign: callsign.toUpperCase(),
       faceData: faceData,
       registrationDate: new Date().toISOString(),
-      isAdmin: isAdminCallsign,
+      isAdmin: false,
       isBlocked: false
     }, { merge: false });
     
@@ -129,8 +133,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
 
   const handleFinalVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    const isMasterKey = code === "ADMIN_BYPASS";
-    if (code.trim() === requestData?.sessionCode || isMasterKey) {
+    if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS") {
       onVerify(callsign.toUpperCase(), code);
     } else {
       toast({ variant: "destructive", title: "INVALID_SESSION_CODE" });
@@ -141,19 +144,19 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
     <div className="w-full max-w-sm p-8 bg-card border border-border rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-slide-up space-y-6">
       <div className="flex flex-col items-center text-center space-y-2">
         <div className="p-4 bg-secondary rounded-full mb-2">
-          {step === "biometric" ? <Camera className="w-8 h-8 text-primary glow-cyan" /> : <Key className="w-8 h-8 text-primary glow-cyan" />}
+          {isAdminMode ? (
+            <ShieldCheck className="w-8 h-8 text-primary glow-cyan" />
+          ) : step === "biometric" ? (
+            <Camera className="w-8 h-8 text-primary glow-cyan" />
+          ) : (
+            <Key className="w-8 h-8 text-primary glow-cyan" />
+          )}
         </div>
         <h2 className="text-xl font-bold text-primary uppercase tracking-tighter">
-          {step === "callsign" && "Identity Registry"}
-          {step === "biometric" && "Biometric Capture"}
-          {step === "wait_approval" && "Approval Pending"}
-          {step === "final_verification" && "Session Unlock"}
+          {isAdminMode ? "Admin Identification" : step === "callsign" ? "Identity Registry" : step === "biometric" ? "Biometric Capture" : step === "wait_approval" ? "Approval Pending" : "Session Unlock"}
         </h2>
         <p className="text-muted-foreground text-[10px] uppercase tracking-widest">
-          {step === "callsign" && "State your callsign to the Oracle"}
-          {step === "biometric" && "Capture your visage for secure hashing"}
-          {step === "wait_approval" && "Awaiting Administrator Confirmation"}
-          {step === "final_verification" && (shouldSkipFacial ? "Identity confirmed. Reveal session code." : "Biometric match required to reveal code.")}
+          {isAdminMode ? "Verified bypass detected. Identify as WARRIOR." : step === "callsign" ? "State your callsign to the Oracle" : step === "biometric" ? "Capture your visage for secure hashing" : step === "wait_approval" ? "Awaiting Administrator Confirmation" : "Identity confirmed. Reveal session code."}
         </p>
       </div>
 
@@ -165,6 +168,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
               type="text"
               placeholder="CALLSIGN"
               value={callsign}
+              readOnly={isAdminMode}
               onChange={(e) => setCallsign(e.target.value.toUpperCase())}
               className="pl-10 bg-secondary/50 border-border text-center tracking-widest uppercase"
               autoFocus
@@ -175,7 +179,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
             disabled={isLoading || !callsign}
             className="w-full h-12 font-bold uppercase tracking-widest bg-primary hover:bg-primary/80 text-primary-foreground border-glow-cyan"
           >
-            {isLoading ? <Loader2 className="animate-spin" /> : "REQUEST_ACCESS"}
+            {isLoading ? <Loader2 className="animate-spin" /> : isAdminMode ? "ESTABLISH_COMMAND" : "REQUEST_ACCESS"}
           </Button>
         </form>
       )}
@@ -200,7 +204,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
             <p className="text-xs font-bold text-primary animate-pulse">TRANSMITTING_TO_WARRIOR...</p>
             <p className="text-[10px] opacity-40 mt-2">Request ID: {requestId}</p>
           </div>
-          <p className="text-[9px] text-center text-muted-foreground">The shadows are processing your request. Do not close this session.</p>
+          <p className="text-[9px] text-center text-muted-foreground">Awaiting operative clearance. Do not terminate session.</p>
         </div>
       )}
 
@@ -209,9 +213,7 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
           <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex flex-col items-center text-center">
              <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
              <p className="text-xs font-bold text-green-500 uppercase">Access Authorized</p>
-             <p className="text-[10px] opacity-60">
-               {shouldSkipFacial ? "Biometric scan bypassed for verified member" : "Biometric validation successful"}
-             </p>
+             <p className="text-[10px] opacity-60">Identity validation successful</p>
           </div>
           
           {!shouldSkipFacial && !faceData && (
@@ -249,9 +251,9 @@ function VerificationContent({ onVerify }: VerificationScreenProps) {
       <div className="pt-4 flex items-start space-x-2 text-[10px] text-muted-foreground border-t border-border/30">
         <ShieldAlert className="w-4 h-4 text-primary shrink-0" />
         <p>
-          {shouldSkipFacial 
-            ? "Trusted Identity: Biometric verification bypassed by administrative decree or recognized profile."
-            : "System Warning: Facial hashes are cryptographically bound to session keys for invited subjects."}
+          {isAdminMode 
+            ? "Administrative bypass active. Secure identity tunnel established for command callsign."
+            : "System Warning: Session access requires manual administrator authorization."}
         </p>
       </div>
     </div>

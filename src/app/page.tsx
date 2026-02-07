@@ -12,12 +12,12 @@ import { doc } from "firebase/firestore";
 
 function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
+  const [isAdminEntry, setIsAdminEntry] = useState(false);
   const [sessionData, setSessionData] = useState<{ callsign: string; key: string } | null>(null);
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const auth = useAuth();
 
-  // Ensure user is signed in anonymously at the root level to provide auth context for gateway/verification
   useEffect(() => {
     if (!isUserLoading && !user) {
       initiateAnonymousSignIn(auth);
@@ -32,17 +32,16 @@ function RavenOracleApp() {
   const { data: adminData, isLoading: isAdminLoading } = useDoc(adminDocRef);
   const isAdmin = !!adminData;
 
-  const handleGatewaySuccess = () => {
+  const handleGatewaySuccess = (isAdminMode: boolean) => {
+    setIsAdminEntry(isAdminMode);
     setPhase("verification");
   };
 
   const handleVerificationSuccess = (callsign: string, key: string) => {
     if (user) {
-      // "WARRIOR" is the designated admin callsign
-      const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
+      const isSystemAdmin = isAdminEntry || key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
-      // Update core user record
       setDocumentNonBlocking(doc(db, "users", user.uid), {
         id: user.uid,
         callsign: finalCallsign,
@@ -52,10 +51,8 @@ function RavenOracleApp() {
       }, { merge: true });
 
       if (isSystemAdmin) {
-        // Bootstrap admin role explicitly in Firestore to satisfy security rules for listing data
         setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true, callsign: finalCallsign }, { merge: true });
-        setSessionData({ callsign: finalCallsign, key });
-        // Admins go straight to the admin portal
+        setSessionData({ callsign: finalCallsign, key: key || "ADMIN_SESSION" });
         setPhase("admin");
       } else {
         setSessionData({ callsign: finalCallsign, key });
@@ -72,6 +69,7 @@ function RavenOracleApp() {
 
   const handleSessionEnd = () => {
     setSessionData(null);
+    setIsAdminEntry(false);
     setPhase("gateway");
   };
 
@@ -87,7 +85,7 @@ function RavenOracleApp() {
     <main className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-background">
       {phase === "gateway" && <GatewayScreen onUnlock={handleGatewaySuccess} />}
       
-      {phase === "verification" && <VerificationScreen onVerify={handleVerificationSuccess} />}
+      {phase === "verification" && <VerificationScreen onVerify={handleVerificationSuccess} isAdminMode={isAdminEntry} />}
       
       {phase === "chat" && sessionData && (
         <ChatRoom 
@@ -99,9 +97,9 @@ function RavenOracleApp() {
         />
       )}
 
-      {phase === "admin" && isAdmin && (
+      {phase === "admin" && (isAdmin || isAdminEntry) && (
         <AdminPanel 
-          onClose={() => setPhase("chat")} 
+          onClose={handleSessionEnd} 
         />
       )}
       

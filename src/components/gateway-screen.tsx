@@ -6,7 +6,7 @@ import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 
 interface GatewayScreenProps {
-  onUnlock: () => void;
+  onUnlock: (isAdminMode: boolean) => void;
 }
 
 export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
@@ -28,9 +28,14 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const targetSequence = gatewayData?.gatewayAddress || "raven.oracle";
+    const adminSequence = gatewayData?.adminAddress || "raven.admin";
     
-    if (input.toLowerCase().trim() === targetSequence.toLowerCase()) {
-      onUnlock();
+    const submitted = input.toLowerCase().trim();
+
+    if (submitted === adminSequence.toLowerCase()) {
+      onUnlock(true); // Admin Bypass Mode
+    } else if (submitted === targetSequence.toLowerCase()) {
+      onUnlock(false); // Operative Mode
     } else {
       setError(true);
       setInput("");
@@ -40,7 +45,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
-      {/* Visual Header Icon from Screenshot */}
+      {/* Visual Header Icon */}
       <div className="mb-12 flex items-center justify-center">
         <div className="relative flex items-baseline space-x-1">
           <span className="text-6xl font-bold text-primary glow-cyan transition-all duration-500 group-hover:scale-110">
@@ -57,7 +62,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
         </div>
         
         <p className="text-muted-foreground text-sm leading-relaxed mb-8 opacity-80">
-          The shadows await. To proceed, identify yourself to the Oracle.
+          The shadows await. State the sequence to proceed.
         </p>
 
         <form onSubmit={handleSubmit} className="relative">
@@ -68,7 +73,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              className={`bg-transparent border-none outline-none flex-1 text-foreground placeholder:text-muted/20 ${error ? 'text-destructive' : ''} tracking-wider`}
+              className={`bg-transparent border-none outline-none flex-1 text-foreground placeholder:text-muted/20 ${error ? 'text-destructive' : ''} tracking-wider uppercase`}
               placeholder="type sequence..."
               autoFocus
             />

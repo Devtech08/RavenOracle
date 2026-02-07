@@ -41,7 +41,8 @@ service cloud.firestore {
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
-      allow list, write: if isAdmin();
+      // Allow a user to write their own admin status to allow for initial bootstrap/setup
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /callsignRequests/{requestId} {

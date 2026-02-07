@@ -10,18 +10,15 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { 
   ShieldCheck, 
-  UserPlus, 
   Trash2, 
   X, 
   Ban,
   Check,
-  UserCheck,
-  Zap,
-  Fingerprint
+  Zap
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { useFirestore, useCollection, useDoc, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -45,67 +42,51 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
   const gatewayRef = useMemoFirebase(() => doc(db, "gateway", "default"), [db]);
   const { data: gatewayData } = useDoc(gatewayRef);
 
-  const handleUpdateGateway = async () => {
+  const handleUpdateGateway = () => {
     if (!newGateway.trim()) return;
-    try {
-      await setDoc(gatewayRef, {
-        gatewayAddress: newGateway.trim().toLowerCase(),
-        lastUpdated: new Date().toISOString()
-      }, { merge: true });
-      toast({ title: "GATEWAY_UPDATED" });
-      setNewGateway("");
-    } catch (e) {
-      toast({ variant: "destructive", title: "UPDATE_FAILED" });
-    }
+    setDocumentNonBlocking(gatewayRef, {
+      gatewayAddress: newGateway.trim().toLowerCase(),
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
+    toast({ title: "GATEWAY_UPDATED" });
+    setNewGateway("");
   };
 
-  const handleGenerateInvite = async () => {
+  const handleGenerateInvite = () => {
     const newKey = `KEY-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const keyId = Math.random().toString(36).substring(7);
-    await setDoc(doc(db, "accessKeys", keyId), {
+    setDocumentNonBlocking(doc(db, "accessKeys", keyId), {
       accessKey: newKey,
       isUsed: false,
       createdAt: new Date().toISOString()
-    });
+    }, { merge: false });
     setInviteLink(`${window.location.origin}/?invite=${newKey}`);
   };
 
-  const handleApproveCallsign = async (request: any) => {
-    try {
-      await updateDoc(doc(db, "users", request.userId), {
-        callsign: request.requestedCallsign
-      });
-      await deleteDoc(doc(db, "callsignRequests", request.id));
-      toast({ title: "CALLSIGN_APPROVED" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "APPROVAL_FAILED" });
-    }
+  const handleApproveCallsign = (request: any) => {
+    updateDocumentNonBlocking(doc(db, "users", request.userId), {
+      callsign: request.requestedCallsign
+    });
+    deleteDocumentNonBlocking(doc(db, "callsignRequests", request.id));
+    toast({ title: "CALLSIGN_APPROVED" });
   };
 
-  const handleApproveSession = async (request: any) => {
-    try {
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      await updateDoc(doc(db, "sessionRequests", request.id), {
-        status: "approved",
-        sessionCode: code
-      });
-      toast({ title: "SESSION_AUTHORIZED" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "AUTH_FAILED" });
-    }
+  const handleApproveSession = (request: any) => {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    updateDocumentNonBlocking(doc(db, "sessionRequests", request.id), {
+      status: "approved",
+      sessionCode: code
+    });
+    toast({ title: "SESSION_AUTHORIZED" });
   };
 
-  const handleAction = async (userId: string, action: 'block' | 'delete') => {
-    try {
-      if (action === 'delete') {
-        await deleteDoc(doc(db, "users", userId));
-        toast({ title: "USER_PURGED" });
-      } else {
-        await updateDoc(doc(db, "users", userId), { isBlocked: true });
-        toast({ title: "USER_TERMINATED" });
-      }
-    } catch (e) {
-      toast({ variant: "destructive", title: "ACTION_FAILED" });
+  const handleAction = (userId: string, action: 'block' | 'delete') => {
+    if (action === 'delete') {
+      deleteDocumentNonBlocking(doc(db, "users", userId));
+      toast({ title: "USER_PURGED" });
+    } else {
+      updateDocumentNonBlocking(doc(db, "users", userId), { isBlocked: true });
+      toast({ title: "USER_TERMINATED" });
     }
   };
 
@@ -153,7 +134,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleApproveSession(req)}>
                           <Zap className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, "sessionRequests", req.id))}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, "sessionRequests", req.id))}>
                           <X className="w-4 h-4" />
                         </Button>
                       </TableCell>
@@ -226,7 +207,7 @@ export function AdminPanel({ onClose }: AdminPanelProps) {
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500" onClick={() => handleApproveCallsign(req)}>
                           <Check className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDoc(doc(db, "callsignRequests", req.id))}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, "callsignRequests", req.id))}>
                           <X className="w-4 h-4" />
                         </Button>
                       </TableCell>

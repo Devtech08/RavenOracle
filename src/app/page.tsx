@@ -7,8 +7,8 @@ import { VerificationScreen } from "@/components/verification-screen";
 import { ChatRoom } from "@/components/chat-room";
 import { AdminPanel } from "@/components/admin-panel";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
-import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { useUser, useFirestore, useDoc, useMemoFirebase, useAuth, initiateAnonymousSignIn, setDocumentNonBlocking } from "@/firebase";
+import { doc } from "firebase/firestore";
 
 function RavenOracleApp() {
   const [phase, setPhase] = useState<"gateway" | "verification" | "chat" | "admin">("gateway");
@@ -41,7 +41,7 @@ function RavenOracleApp() {
       const isSystemAdmin = key === "ADMIN_BYPASS" || isAdmin || callsign.toUpperCase() === "WARRIOR";
       const finalCallsign = isSystemAdmin ? "WARRIOR" : callsign.toUpperCase();
       
-      setDoc(doc(db, "users", user.uid), {
+      setDocumentNonBlocking(doc(db, "users", user.uid), {
         id: user.uid,
         callsign: finalCallsign,
         registrationDate: new Date().toISOString(),
@@ -50,7 +50,7 @@ function RavenOracleApp() {
       }, { merge: true });
 
       if (isSystemAdmin) {
-        setDoc(doc(db, "roles_admin", user.uid), { enabled: true }, { merge: true });
+        setDocumentNonBlocking(doc(db, "roles_admin", user.uid), { enabled: true }, { merge: true });
         setSessionData({ callsign: finalCallsign, key });
         // Admins go straight to the admin portal
         setPhase("admin");

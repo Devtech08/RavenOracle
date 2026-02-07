@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, Key, User, Camera, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, query, where, getDocs, updateDoc, doc, addDoc, setDoc } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, setDocumentNonBlocking } from "@/firebase";
+import { collection, query, where, getDocs, doc } from "firebase/firestore";
 import { FaceCapture } from "@/components/face-capture";
 
 interface VerificationScreenProps {
@@ -47,8 +47,6 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
     
     setIsLoading(true);
     try {
-      // Check if user exists
-      const userRef = doc(db, "users", user.uid);
       const userSnap = await getDocs(query(collection(db, "users"), where("id", "==", user.uid)));
       
       if (userSnap.empty) {
@@ -64,46 +62,42 @@ export function VerificationScreen({ onVerify }: VerificationScreenProps) {
     }
   };
 
-  const handleFaceCapture = async (data: string) => {
+  const handleFaceCapture = (data: string) => {
     setFaceData(data);
   };
 
-  const handleRegistrationComplete = async () => {
+  const handleRegistrationComplete = () => {
     if (!faceData || !user) return;
     setIsLoading(true);
-    try {
-      await setDoc(doc(db, "users", user.uid), {
-        id: user.uid,
-        callsign: callsign.toUpperCase(),
-        faceData: faceData,
-        registrationDate: new Date().toISOString(),
-        isAdmin: false,
-        isBlocked: false
-      });
-      
-      createSessionRequest(callsign);
-      setStep("wait_approval");
-    } catch (e) {
-      toast({ variant: "destructive", title: "REGISTRATION_FAILED" });
-    } finally {
-      setIsLoading(false);
-    }
+    
+    setDocumentNonBlocking(doc(db, "users", user.uid), {
+      id: user.uid,
+      callsign: callsign.toUpperCase(),
+      faceData: faceData,
+      registrationDate: new Date().toISOString(),
+      isAdmin: false,
+      isBlocked: false
+    }, { merge: false });
+    
+    createSessionRequest(callsign);
+    setStep("wait_approval");
+    setIsLoading(false);
   };
 
-  const createSessionRequest = async (name: string) => {
+  const createSessionRequest = (name: string) => {
     if (!user) return;
     const reqId = Math.random().toString(36).substring(7);
-    await setDoc(doc(db, "sessionRequests", reqId), {
+    setDocumentNonBlocking(doc(db, "sessionRequests", reqId), {
       id: reqId,
       userId: user.uid,
       callsign: name.toUpperCase(),
       status: "pending",
       timestamp: new Date().toISOString()
-    });
+    }, { merge: false });
     setRequestId(reqId);
   };
 
-  const handleFinalVerify = async (e: React.FormEvent) => {
+  const handleFinalVerify = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim() === requestData?.sessionCode || code === "ADMIN_BYPASS") {
       onVerify(callsign.toUpperCase(), code);

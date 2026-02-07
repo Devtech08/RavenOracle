@@ -23,8 +23,8 @@ import {
   History
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, addDoc, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc, query, orderBy, serverTimestamp } from "firebase/firestore";
 
 interface Message {
   id: string;
@@ -100,7 +100,7 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     }
   }, [displayMessages]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !user) return;
 
@@ -108,64 +108,55 @@ export function ChatRoom({ callsign: initialCallsign, sessionKey, isAdmin, onLog
     setInput("");
 
     // 1. Write to Firestore (Permanent log for Admin)
-    try {
-      addDoc(collection(db, "messageLogs"), {
+    addDocumentNonBlocking(collection(db, "messageLogs"), {
+      sender: currentCallsign,
+      userId: user.uid,
+      content: messageContent,
+      timestamp: serverTimestamp()
+    });
+
+    // 2. Update local state for Non-Admins (Session-only visibility)
+    if (!isAdmin) {
+      const newMessage: Message = {
+        id: `msg-${Date.now()}`,
         sender: currentCallsign,
-        userId: user.uid,
         content: messageContent,
-        timestamp: serverTimestamp()
-      });
+        timestamp: new Date().toLocaleTimeString(),
+        isMe: true,
+      };
+      setSessionMessages((prev) => [...prev, newMessage]);
 
-      // 2. Update local state for Non-Admins (Session-only visibility)
-      if (!isAdmin) {
-        const newMessage: Message = {
-          id: `msg-${Date.now()}`,
-          sender: currentCallsign,
-          content: messageContent,
+      // Simulated Oracle reply for Users
+      setTimeout(() => {
+        const reply: Message = {
+          id: `reply-${Date.now()}`,
+          sender: "ORACLE",
+          content: `Acknowledged, ${currentCallsign}. Data packet encrypted and archived.`,
           timestamp: new Date().toLocaleTimeString(),
-          isMe: true,
+          isMe: false,
         };
-        setSessionMessages((prev) => [...prev, newMessage]);
-
-        // Simulated Oracle reply for Users
-        setTimeout(() => {
-          const reply: Message = {
-            id: `reply-${Date.now()}`,
-            sender: "ORACLE",
-            content: `Acknowledged, ${currentCallsign}. Data packet encrypted and archived.`,
-            timestamp: new Date().toLocaleTimeString(),
-            isMe: false,
-          };
-          setSessionMessages((prev) => [...prev, reply]);
-        }, 1500);
-      }
-    } catch (err) {
-      toast({ variant: "destructive", title: "SEND_FAILED" });
+        setSessionMessages((prev) => [...prev, reply]);
+      }, 1500);
     }
   };
 
-  const handleRequestCallsign = async () => {
+  const handleRequestCallsign = () => {
     if (!newCallsign.trim() || !user) return;
     setIsRequesting(true);
     
-    try {
-      const requestId = Math.random().toString(36).substring(7);
-      await addDoc(collection(db, "callsignRequests"), {
-        id: requestId,
-        userId: user.uid,
-        currentCallsign: currentCallsign,
-        requestedCallsign: newCallsign.trim().toUpperCase(),
-        status: "pending",
-        timestamp: new Date().toISOString()
-      });
-      
-      toast({ title: "REQUEST_SUBMITTED", description: "Admin approval required for callsign update." });
-      setNewCallsign("");
-    } catch (e) {
-      toast({ variant: "destructive", title: "REQUEST_FAILED" });
-    } finally {
-      setIsRequesting(false);
-    }
+    const requestId = Math.random().toString(36).substring(7);
+    addDocumentNonBlocking(collection(db, "callsignRequests"), {
+      id: requestId,
+      userId: user.uid,
+      currentCallsign: currentCallsign,
+      requestedCallsign: newCallsign.trim().toUpperCase(),
+      status: "pending",
+      timestamp: new Date().toISOString()
+    });
+    
+    toast({ title: "REQUEST_SUBMITTED", description: "Admin approval required for callsign update." });
+    setNewCallsign("");
+    setIsRequesting(false);
   };
 
   return (

@@ -87,9 +87,14 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
         </form>
       </div>
 
-      <p className="mt-12 text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
-        Requires Oracle Authentication Sequence
-      </p>
+      <div className="mt-12 flex flex-col items-center space-y-2">
+        <p className="text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
+          Requires Oracle Authentication Sequence
+        </p>
+        <p className="text-primary text-[10px] tracking-[0.5em] uppercase opacity-20 font-bold animate-pulse">
+          warrior
+        </p>
+      </div>
     </div>
   );
 }

@@ -7,8 +7,7 @@ import { getFirestore } from 'firebase/firestore'
 
 /**
  * Initializes Firebase with a focus on stability across both Client and Server environments.
- * The 'app/no-options' error is often caused by initializeApp() being called without a config
- * during server-side pre-rendering in Next.js.
+ * Hardened to prevent the 'app/no-options' error by always utilizing the config object.
  */
 export function initializeFirebase() {
   // Check if an app is already initialized to avoid "Duplicate App" errors.
@@ -17,14 +16,18 @@ export function initializeFirebase() {
     return getSdks(apps[0]);
   }
 
-  // Explicitly initialize with the config object.
-  // We use a try-catch as a safety measure for environments with complex lifecycle hooks.
+  // Explicitly initialize with the config object to satisfy Hosting detection logic.
   let firebaseApp: FirebaseApp;
   try {
     firebaseApp = initializeApp(firebaseConfig);
   } catch (e) {
-    // If the default app exists but wasn't caught by getApps() (rare), return it.
-    firebaseApp = getApp();
+    // If initialization fails but an app exists, attempt recovery.
+    try {
+      firebaseApp = getApp();
+    } catch {
+      // Final fallback if everything fails.
+      firebaseApp = initializeApp(firebaseConfig);
+    }
   }
 
   return getSdks(firebaseApp);

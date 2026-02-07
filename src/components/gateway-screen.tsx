@@ -47,13 +47,8 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
     <div className="flex flex-col items-center justify-center w-full min-h-screen bg-background p-4 animate-fade-in font-body">
       <div className="mb-4 flex flex-col items-center justify-center group">
         
-        {/* Gateway Page Name - Restored for tactical identity */}
-        <h1 className="text-4xl md:text-6xl font-bold tracking-[0.3em] uppercase text-primary mb-8 glow-cyan flicker opacity-90 select-none">
-          Raven Oracle
-        </h1>
-
-        {/* Isolated Identity Emblem */}
-        <div className="mb-12 relative w-56 h-56 flex flex-col items-center justify-center bg-transparent overflow-hidden">
+        {/* Isolated Identity Emblem - No text header above as requested */}
+        <div className="mb-12 relative w-64 h-64 flex flex-col items-center justify-center bg-transparent overflow-hidden">
           {logoExists ? (
             <img 
               src="/logo.jpeg" 
@@ -121,6 +116,10 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
       <div className="mt-12 flex flex-col items-center space-y-2">
         <p className="text-muted-foreground text-[10px] tracking-[0.3em] uppercase opacity-30 font-bold">
           Requires Oracle Authentication
+        </p>
+        {/* Added WARRIOR signature below as requested */}
+        <p className="text-primary text-[11px] tracking-[0.5em] uppercase opacity-40 font-bold glow-cyan">
+          WARRIOR
         </p>
       </div>
     </div>

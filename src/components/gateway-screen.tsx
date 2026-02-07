@@ -54,7 +54,7 @@ export function GatewayScreen({ onUnlock }: GatewayScreenProps) {
             <img 
               src="/logo.jpeg" 
               alt="IDENTITY_EMBLEM" 
-              className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-105 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
+              className="w-full h-full object-contain mix-blend-screen opacity-90 group-hover:opacity-100 transition-all duration-700 scale-100 group-hover:scale-105 drop-shadow-[0_0_20px_rgba(0,255,255,0.4)]"
               onError={() => setLogoExists(false)}
             />
           ) : (
